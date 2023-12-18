@@ -10,9 +10,9 @@ $databasename = "myDB";
 $conn = mysqli_connect($servername, $username, $password, $databasename);
 
 // Tries connection to the MYSQL server
-if (!$conn) {
-    die("Connection failed: " . mysqli_connect_error());
-}
+//if (!$conn) {
+//    die("Connection failed: " . mysqli_connect_error());
+//}
 
 // Runs MYSQL commands
 
@@ -38,13 +38,13 @@ SOME EXAMPLES:
 
 */
 
-
+/*
 $sql = "DELETE FROM People WHERE id= 2";
 if (mysqli_query($conn, $sql)) {
     echo "Table \"People\" created successfully";
 } else {
     echo "Error: " . $sql . "<br>" . mysqli_error($conn);
 }
-
+*/
 mysqli_close($conn);
 ?>
