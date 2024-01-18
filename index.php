@@ -72,8 +72,98 @@
     GLN: <input type="text" name="gln" value="<?php echo $gln;?>">
     <span class="error">* <?php echo $glnErr;?></span>
     <br><br>
-    <input type="submit" class="button" name="get_gln" value="Get name">  
+    <input type="submit" class="button" name="get_gln" value="Get name">
 </form>
+
+
+<!-- Form to print first 10 med_gln from database -->
+<form method="post">
+    <input type="submit" class="button" name="get_med_gln" value="Get Med gln">
+</html>
+
+
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Box Example</title>
+    <style>
+        .text-box {
+            border: 2px solid #000;
+            padding: 10px;
+            margin: 10px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+
+    <?php
+        $text = "";
+
+        if ($_SERVER['REQUEST_METHOD'] == "POST") {
+            if (isset($_POST["get_med_gln"])) {
+                $glns = get_glns("med_gln");
+
+                for ($i = 0; $i < 10; $i++) {
+                    $text = $text . $glns[$i] . "<br>";
+                }
+            }
+        }
+    ?>
+
+    <div class="text-box">
+        <?php echo $text; ?>
+    </div>
+
+</body>
+</html>
+
+
+
+<!-- Form to print first 10 psy_gln from database -->
+<form method="post">
+    <input type="submit" class="button" name="get_psy_gln" value="Get Psy gln">
+</html>
+
+
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Box Example</title>
+    <style>
+        .text-box {
+            border: 2px solid #000;
+            padding: 10px;
+            margin: 10px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+
+    <?php
+        $text = "";
+        if ($_SERVER['REQUEST_METHOD'] == "POST") {
+            if (isset($_POST["get_psy_gln"])) {
+                $glns = get_glns("psy_gln");
+
+                for ($i = 0; $i < 10; $i++) {
+                    $text = $text . $glns[$i] . "<br>";
+                }
+            }
+        }
+    ?>
+
+    <div class="text-box">
+        <?php echo $text; ?>
+    </div>
+
+</body>
+</html>
 
 
 
@@ -152,7 +242,29 @@
                 }
             }
         }
+    }
 
+
+
+    // Function to retrieve all glns contained in the stammdaten_gln DB, specifically from the tables med_gln and psy_gln
+    function get_glns($type) {
+
+        $glns = array();
+
+        $conn = connect_to_db("stammdaten_gln");
+
+        $query = "SELECT gln FROM $type;";
+        $result = mysqli_query($conn, $query);
+
+        if (mysqli_num_rows($result) > 0) {
+            while($row = mysqli_fetch_assoc($result)) {
+                $glns[] = $row["gln"];
+            }
+        }
+
+        mysqli_close($conn);
+
+        return $glns;
     }
 
 
