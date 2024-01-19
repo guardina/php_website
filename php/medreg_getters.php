@@ -13,33 +13,33 @@
 
             // Payload sent to the website with a POST request, in order to obtain information about the doctor
             $payload = array(
-                /*"cetTitleKindIds" => null, 
-                "city" => null, 
-                "firstName" => null, 
-                "genderId" => null,*/ 
-                "gln" => $gln
-                /*"houseNumber" => null, 
-                "languageId" => null, 
-                "name" => null, 
-                "nationalityId" => null, 
-                "permissionCantonId" => null, 
-                "privateLawCetTitleKindIds" => null, 
-                "professionalPracticeLicenseId" => null, 
-                "professionId" => null, 
-                "street" => null, 
-                "zip" => null*/
+                        /*"cetTitleKindIds" => null
+                ,       "city" => null
+                ,       "firstName" => null
+                ,       "genderId" => null
+                ,*/      "gln" => $gln
+                /*,      "houseNumber" => null
+                ,       "languageId" => null
+                ,       "name" => null
+                ,       "nationalityId" => null
+                ,       "permissionCantonId" => null
+                ,       "privateLawCetTitleKindIds" => null
+                ,       "professionalPracticeLicenseId" => null
+                ,       "professionId" => null
+                ,       "street" => null
+                ,       "zip" => null*/
             );
 
         } else if ($register == 'betreg') {
             $url = "https://www.healthreg-public.admin.ch/api/betreg/public/company/search";
 
             $payload = array(
-                /*"city" => null, 
-                "companyTypeId" => null,*/
-                "glnCompany" => $gln
-                /*"name" => null, 
-                "permissionCantonId" => null, 
-                "zip" => null*/
+                /*      "city" => null
+                ,       "companyTypeId" => null
+                ,*/     "glnCompany" => $gln
+                /*,     "name" => null
+                ,       "permissionCantonId" => null
+                ,       "zip" => null*/
             );
         }
 
@@ -56,19 +56,19 @@
 
         // Extra options to add to the request (api-key is necessary to obtain the JSON response)
         $options = array (
-            "Accept: application/json, text/plain, */*",
-            "Accept-Encoding: gzip, deflate, br",
-            "Accept-Language: en-CH; en",
-            "api-key: AB929BB6-8FAC-4298-BC47-74509E45A10B",
-            "Connection: keep-alive",
-            "Content-Type: application/json",
-            "Host: www.healthreg-public.admin.ch",
-            "Origin: https://www.healthreg-public.admin.ch",
-            "Referer: https://www.healthreg-public.admin.ch/$register/search",
-            "Sec-Fetch-Dest: empty",
-            "Sec-Fetch-Mode: cors",
-            "Sec-Fetch-Site: same-origin",
-            "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
+                        "Accept: application/json, text/plain, */*"
+            ,           "Accept-Encoding: gzip, deflate, br"
+            ,           "Accept-Language: en-CH; en"
+            ,           "api-key: AB929BB6-8FAC-4298-BC47-74509E45A10B"
+            ,           "Connection: keep-alive"
+            ,           "Content-Type: application/json"
+            ,           "Host: www.healthreg-public.admin.ch"
+            ,           "Origin: https://www.healthreg-public.admin.ch"
+            ,           "Referer: https://www.healthreg-public.admin.ch/$register/search"
+            ,           "Sec-Fetch-Dest: empty"
+            ,           "Sec-Fetch-Mode: cors"
+            ,           "Sec-Fetch-Site: same-origin"
+            ,           "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
         );
 
 
@@ -83,18 +83,21 @@
         $output = curl_exec($ch);
         $result = json_decode($output, true);
 
-        $id = $result['entries'];
-        $id = $id[0];
-        $id = $id['id'];
+        $id = $result['entries'][0]['id'];
 
-
-        $full_data_url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
         $full_data_payload = array('id' => $id);
 
 
+        if (in_array($register, ['medreg', 'psyreg'])) {
+            $full_data_url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($full_data_payload));
+        } else if ($register == 'betreg') {
+            curl_setopt($ch, CURLOPT_POST, 0);
+            $full_data_url = "https://www.healthreg-public.admin.ch/api/betreg/public/company/" . $id;
+        }
+
         curl_setopt($ch, CURLOPT_URL, $full_data_url);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($full_data_payload));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $options);
 
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
