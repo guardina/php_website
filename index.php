@@ -56,7 +56,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text Box Example</title>
     <style>
         .text-box {
             border: 2px solid #000;
@@ -102,7 +101,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text Box Example</title>
     <style>
         .text-box {
             border: 2px solid #000;
@@ -175,6 +173,10 @@
 
                     echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
                     $data = get_data_from_gln("$gln", $register);
+
+                    /*foreach($data as $k => $v) {
+                        echo $k . ' ' . $v . '<br>';
+                    }*/
 
                     if (empty($data)) {
                         echo '<p class="error">Couldn\'t find data for the provided gln.</p>';

@@ -13,12 +13,12 @@
 
             // Payload sent to the website with a POST request, in order to obtain information about the doctor
             $payload = array(
-                "cetTitleKindIds" => null, 
+                /*"cetTitleKindIds" => null, 
                 "city" => null, 
                 "firstName" => null, 
-                "genderId" => null, 
-                "gln" => $gln, 
-                "houseNumber" => null, 
+                "genderId" => null,*/ 
+                "gln" => $gln
+                /*"houseNumber" => null, 
                 "languageId" => null, 
                 "name" => null, 
                 "nationalityId" => null, 
@@ -27,19 +27,19 @@
                 "professionalPracticeLicenseId" => null, 
                 "professionId" => null, 
                 "street" => null, 
-                "zip" => null
+                "zip" => null*/
             );
 
         } else if ($register == 'betreg') {
             $url = "https://www.healthreg-public.admin.ch/api/betreg/public/company/search";
 
             $payload = array(
-                "city" => null, 
-                "companyTypeId" => null, 
-                "glnCompany" => $gln, 
-                "name" => null, 
+                /*"city" => null, 
+                "companyTypeId" => null,*/
+                "glnCompany" => $gln
+                /*"name" => null, 
                 "permissionCantonId" => null, 
-                "zip" => null
+                "zip" => null*/
             );
         }
 
@@ -83,15 +83,41 @@
         $output = curl_exec($ch);
         $result = json_decode($output, true);
 
+        $id = $result['entries'];
+        $id = $id[0];
+        $id = $id['id'];
+
+
+        $full_data_url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
+        $full_data_payload = array('id' => $id);
+
+
+        curl_setopt($ch, CURLOPT_URL, $full_data_url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($full_data_payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $options);
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+
+        $full_output = curl_exec($ch);
+        $full_result = json_decode($full_output, true);
 
 
         $null_less_dictionary = array();
         
-        if ($output === false) {
+        if ($full_output === false) {
             echo "Error: " . curl_error($ch);
         } else {
 
-            $flatten_dictionary = flatten_list($result, '', array());
+            $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            if ($http_status < 200 || $http_status >= 300) {
+                return null;
+            }
+
+
+            $flatten_dictionary = flatten_list($full_result, '', array());
             
 
             foreach($flatten_dictionary as $k => $v) {
@@ -115,31 +141,30 @@
 
 
 
-    // Recursive function to "flatten" nested dictionaries and stores the single values inside of the dictionary, according to the key
+    // Recursive function to "flatten" nested dictionaries and stores the single values inside of the dictionar y, according to the key
     // Example: [key1 -> value1, key2 -> [key3 -> value3]] ===> key1 -> value1 / key2_key3 -> value3
-    function flatten_list($list, $prefix = '', $resulting_dictionary) {
+    function flatten_list($list, $prefix, $resulting_dictionary) {
 
-        $list_rejected = array('maxResultCount', 'tooManyResults', '0_parentId', 'canton_id', '0_isActive', 'profession_id', 'canton_isActive');
+        $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAknowledgeable', 'isFederal', '_id');
 
         foreach ($list as $key => $value) {
             if (is_array($value)) {
-                $resulting_dictionary = flatten_list($value, $key . '_', $resulting_dictionary);
+                $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary);
             } else {
+                $ignore = false;
                 $string = $prefix . $key;
-                if (!in_array($string, $list_rejected)) {
+                foreach($list_rejected as $substring) {
+                    if (strpos($string, $substring) !== false) {
+                        $ignore = true;
+                        break;
+                    }
+                }
+
+                if (!$ignore) {
                     $resulting_dictionary[$string] = $value;
-                } else {
-                    ;
                 }
             }
         }
-
         return $resulting_dictionary;
     }
-
-    /*
-    https://www.healthreg-public.admin.ch/api/medreg/public/person/search   <------ Get ID of the person/betreg from here
-    https://www.healthreg-public.admin.ch/api/medreg/public/person          <------ Use the ID as payload to get all info
-    */
-
 ?>

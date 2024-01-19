@@ -3,7 +3,6 @@
     $medreg_db_names = array(
         '0_name' => 'lastName',
         '0_firstName' => 'firstName',
-        'profession_isActive' => 'isActive',
         'profession_textDe' => 'profession_textDe', 
         'profession_textFr' => 'profession_textFr',
         'profession_textIt' => 'profession_textIt',
