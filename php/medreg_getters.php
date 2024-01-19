@@ -1,15 +1,18 @@
 <?php
-    function save_medreg_doctor_by_gln($gln, $myDictionary, $columnMapping) {
 
-        $url = "https://www.healthreg-public.admin.ch/api/medreg/public/person/search";
+    include "name_mapper.php";
 
 
-        $ch = curl_init();
-    
-    
-        // ARRAY FOR MEDREG
-        // Payload sent to the website with a POST request, in order to obtain information about the doctor
-        $data = array(
+    function get_data_from_gln($gln, $register) {
+
+        $url = "";
+        $payload = "";
+
+        if (in_array($register, ['medreg', 'psyreg'])) {
+            $url = "https://www.healthreg-public.admin.ch/api/$register/public/person/search";
+
+            // Payload sent to the website with a POST request, in order to obtain information about the doctor
+            $payload = array(
                 "cetTitleKindIds" => null, 
                 "city" => null, 
                 "firstName" => null, 
@@ -25,12 +28,32 @@
                 "professionId" => null, 
                 "street" => null, 
                 "zip" => null
-        );
-    
+            );
+
+        } else if ($register == 'betreg') {
+            $url = "https://www.healthreg-public.admin.ch/api/betreg/public/company/search";
+
+            $payload = array(
+                "city" => null, 
+                "companyTypeId" => null, 
+                "glnCompany" => $gln, 
+                "name" => null, 
+                "permissionCantonId" => null, 
+                "zip" => null
+            );
+        }
+
+
+        if ($url == "") {
+            echo '<p class="error"> Invalid register, please choose between one of the following: medreg, psyreg.</p>';
+            return null;
+        }
         
 
 
-        // OPTIONS FOR THE MEDREG
+        $ch = curl_init();
+    
+
         // Extra options to add to the request (api-key is necessary to obtain the JSON response)
         $options = array (
             "Accept: application/json, text/plain, */*",
@@ -41,7 +64,7 @@
             "Content-Type: application/json",
             "Host: www.healthreg-public.admin.ch",
             "Origin: https://www.healthreg-public.admin.ch",
-            "Referer: https://www.healthreg-public.admin.ch/medreg/search",
+            "Referer: https://www.healthreg-public.admin.ch/$register/search",
             "Sec-Fetch-Dest: empty",
             "Sec-Fetch-Mode: cors",
             "Sec-Fetch-Site: same-origin",
@@ -49,10 +72,9 @@
         );
 
 
-
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $options);
 
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -62,51 +84,62 @@
         $result = json_decode($output, true);
 
 
-        
 
+        $null_less_dictionary = array();
+        
         if ($output === false) {
             echo "Error: " . curl_error($ch);
         } else {
-            get_single_element($result, '', $myDictionary);
 
-            $conn = connect_to_db("myDB");
+            $flatten_dictionary = flatten_list($result, '', array());
+            
 
+            foreach($flatten_dictionary as $k => $v) {
+                if (!empty($v)){
+                    echo $k . ' ' . $v . '<br>';
+                }
+            }
 
             // From the initial dictionary, we only extract the pairs key-value that actually have a value stored, as we cannot add empty values to a SQL table
-            $non_empty_dict = array();
-
-            foreach($myDictionary as $key => $value) {
+            foreach($flatten_dictionary as $key => $value) {
                 if (!empty($value)) {
-                    $non_empty_dict[$key] = $value;
+                    $null_less_dictionary[$key] = $value;
                 }
             }
-
-
-            // myDictionary has keys taken from the HTML response provided by the site, we need to map them to the column's names in the SQL table
-            $columns = array();
-            $values = array();
-
-            $columns[] = 'gln';
-            $values[] = "$gln";
-
-            foreach ($non_empty_dict as $key => $value) {
-                if (isset($columnMapping[$key])) {
-                    $columns[] = $columnMapping[$key];
-                    $values[] = "'" . mysqli_real_escape_string($conn, $value) . "'";
-                }
-            }
-        
-
-
-            
-            $query = "INSERT INTO Doctors (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $values) . ")";
-
-
-            mysqli_query($conn, $query);
-
-            mysqli_close($conn);
         }
 
         curl_close($ch);
+
+        return $null_less_dictionary;
     }
+
+
+
+    // Recursive function to "flatten" nested dictionaries and stores the single values inside of the dictionary, according to the key
+    // Example: [key1 -> value1, key2 -> [key3 -> value3]] ===> key1 -> value1 / key2_key3 -> value3
+    function flatten_list($list, $prefix = '', $resulting_dictionary) {
+
+        $list_rejected = array('maxResultCount', 'tooManyResults', '0_parentId', 'canton_id', '0_isActive', 'profession_id', 'canton_isActive');
+
+        foreach ($list as $key => $value) {
+            if (is_array($value)) {
+                $resulting_dictionary = flatten_list($value, $key . '_', $resulting_dictionary);
+            } else {
+                $string = $prefix . $key;
+                if (!in_array($string, $list_rejected)) {
+                    $resulting_dictionary[$string] = $value;
+                } else {
+                    ;
+                }
+            }
+        }
+
+        return $resulting_dictionary;
+    }
+
+    /*
+    https://www.healthreg-public.admin.ch/api/medreg/public/person/search   <------ Get ID of the person/betreg from here
+    https://www.healthreg-public.admin.ch/api/medreg/public/person          <------ Use the ID as payload to get all info
+    */
+
 ?>
