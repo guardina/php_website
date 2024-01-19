@@ -20,46 +20,6 @@
     $firstNameErr = $lastNameErr = $ageErr = $glnErr = "";
     $firstName = $lastName = $gln = $inputFile = "";
     $age = 0;
-
-
-    // Dictionary to later store information scraped from medical registers
-    $myDictionary = array(
-        '0_name' => '',
-        '0_firstName' => '',
-        'profession_isActive' => '',
-        'profession_textDe' => '',
-        'profession_textFr' => '',
-        'profession_textIt' => '',
-        'profession_textEn' => '',
-        '0_textDe' => '',
-        '0_textFr' => '',
-        '0_textIt' => '',
-        '0_textEn' => '',
-        'canton_textDe' => '', 
-        'canton_textFr' => '',
-        'canton_textIt' => '',
-        'canton_textEn' => ''
-    );
-
-
-    // Mapping dictionary used to map the keys scraped from medical registers to DB entries
-    $columnMapping = array(
-        '0_name' => 'lastName',
-        '0_firstName' => 'firstName',
-        'profession_isActive' => 'isActive',
-        'profession_textDe' => 'profession_textDe', 
-        'profession_textFr' => 'profession_textFr',
-        'profession_textIt' => 'profession_textIt',
-        'profession_textEn' => 'profession_textEn',
-        '0_textDe' => 'cetTitles_textDe', 
-        '0_textFr' => 'cetTitles_textFr',
-        '0_textIt' => 'cetTitles_textIt',
-        '0_textEn' => 'cetTitles_textEn',
-        'canton_textDe' => 'canton_textDe', 
-        'canton_textFr' => 'canton_textFr',
-        'canton_textIt' => 'canton_textIt',
-        'canton_textEn' => 'canton_textEn'
-);
 ?>
 
 
@@ -81,7 +41,7 @@
     GLN: <input type="text" name="gln" value="<?php echo $gln;?>">
     <span class="error">* <?php echo $glnErr;?></span>
     <br><br>
-    <input type="submit" class="button" name="get_gln" value="Get name">
+    <input type="submit" class="button" name="search_gln" value="Search GLN">
 </form>
 
 
@@ -209,11 +169,22 @@
 
     if($_SERVER['REQUEST_METHOD'] == "POST")
     {
-        if (isset($_POST['get_gln'])) {
+        if (isset($_POST['search_gln'])) {
             if ($gln != "") {
-                save_medreg_doctor_by_gln("$gln", $myDictionary, $columnMapping);
+                foreach(['medreg', 'psyreg', 'betreg'] as $register) {
+
+                    echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
+                    $data = get_data_from_gln("$gln", $register);
+
+                    if (empty($data)) {
+                        echo '<p class="error">Couldn\'t find data for the provided gln.</p>';
+                        continue;
+                    }
+                }
+
+                
             } else {
-                echo "Error! Invalid gln.";
+                echo '<p class="error">Error! Invalid gln.</p>';
             } 
         }
     }
@@ -229,29 +200,6 @@
         $data = stripslashes($data);
         $data = htmlspecialchars($data);
         return $data;
-    }
-
-
-    
-    // Recursive function to "flatten" nested dictionaries and stores the single values inside of the dictionary, according to the key
-    // Example: [key1 -> value1, key2 -> [key3 -> value3]] ===> key1 -> value1 / key2_key3 -> value3
-    function get_single_element($list, $prefix = '', &$myDictionary) {
-
-        $list_accepted = array('0_name', '0_firstName', 'profession_isActive', 'profession_textDe', 'profession_textFr', 'profession_textIt', 'profession_textEn', '0_textDe', '0_textFr', '0_textIt', '0_textEn', 'canton_textDe', 'canton_textFr', 'canton_textIt', 'canton_textEn'); 
-
-        foreach ($list as $key => $value) {
-            if (is_array($value)) {
-                get_single_element($value, $key . '_', $myDictionary);
-            } else {
-                $string = $prefix . $key;
-                if (in_array($string, $list_accepted)) {
-                    $myDictionary[$string] = $value;
-                    //echo $prefix . $key . ': ' . $value . '<br>';
-                } else {
-                    ;
-                }
-            }
-        }
     }
 
 ?>
