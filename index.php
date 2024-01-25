@@ -33,7 +33,7 @@
     <span class="error">* <?php echo $firstNameErr;?></span>
     <br><br>
     Last Name: <input type="text" name="lastName" value="<?php echo $lastName;?>">
-    <span class="error">* <?php echo $lastNameErr;?></span>
+    <span class="error">* <?php echo $lastNameErr;?></span>     
     <br><br>
     Age: <input type="number" min="0" max="100" name="age" value="<?php echo $age;?>">
     <span class="error">* <?php echo $ageErr;?></span>
@@ -41,8 +41,19 @@
     GLN: <input type="text" name="gln" value="<?php echo $gln;?>">
     <span class="error">* <?php echo $glnErr;?></span>
     <br><br>
-    <input type="submit" class="button" name="search_gln" value="Search GLN">
-</form>
+
+    <div style="display: flex; gap: 50px;">
+        <input type="submit" class="button" name="search_gln" value="Search GLN">
+        <select name="language" class="button" id="language">
+	        <option value="">--- Choose a language ---</option>
+	        <option value="De">Deutsch</option>
+	        <option value="Fr">Français</option>
+	        <option value="It">Italiano</option>
+            <option value="En">English</option>
+        </select>
+    </div>
+
+</form> 
 
 
 <!-- Form to print first 10 med_gln from database -->
@@ -172,11 +183,16 @@
                 foreach(['medreg', 'psyreg', 'betreg'] as $register) {
 
                     echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
+
                     $data = get_data_from_gln("$gln", $register);
 
-                    /*foreach($data as $k => $v) {
-                        echo $k . ' ' . $v . '<br>';
-                    }*/
+                    $language = filter_input(INPUT_POST, 'language', FILTER_SANITIZE_STRING);
+
+                    foreach($data as $k => $v) {
+                        if (check_language($k, $language)){
+                            echo $k . ' ' . $v . '<br>';
+                        }
+                    }
 
                     if (empty($data)) {
                         echo '<p class="error">Couldn\'t find data for the provided gln.</p>';
@@ -202,6 +218,22 @@
         $data = stripslashes($data);
         $data = htmlspecialchars($data);
         return $data;
+    }
+
+
+    // Function that provided a key string and a language substring (De|Fr|It|En), returns true if the string is language related and the correct language is selected,
+    // or if the key is not language related
+    // Examples:
+    // $language = Fr:
+    // $key = genderFr => True / $key = genderDe => false / $key = firstName => true
+    function check_language($key, $language) {
+        if (preg_match('/(?:De|Fr|It|En)$/', $key) && preg_match('/^[a-z]+'.$language.'$/', $key)) {
+            return true;    
+        } else if (!preg_match('/(?:De|Fr|It|En)$/', $key)) {
+            return true; 
+        }
+
+        return false;
     }
 
 ?>

@@ -131,11 +131,11 @@
             }
             
 
-            foreach($new_flatten_dictionary as $k => $v) {
+            /*foreach($new_flatten_dictionary as $k => $v) {
                 if (!empty($v)){
                     echo $k . ':     ' . $v . '<br>';
                 }
-            }
+            }*/
 
             // From the initial dictionary, we only extract the pairs key-value that actually have a value stored, as we cannot add empty values to a SQL table
             foreach($new_flatten_dictionary as $key => $value) {
