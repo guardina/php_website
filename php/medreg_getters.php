@@ -121,16 +121,24 @@
 
 
             $flatten_dictionary = flatten_list($full_result, '', array());
-            
+
+            $flatten_dictionary = map_names($flatten_dictionary, $register);
+
+            $new_flatten_dictionary = array();
 
             foreach($flatten_dictionary as $k => $v) {
+                $new_flatten_dictionary[remove_extra($k)] = $v;
+            }
+            
+
+            foreach($new_flatten_dictionary as $k => $v) {
                 if (!empty($v)){
-                    echo $k . ' ' . $v . '<br>';
+                    echo $k . ':     ' . $v . '<br>';
                 }
             }
 
             // From the initial dictionary, we only extract the pairs key-value that actually have a value stored, as we cannot add empty values to a SQL table
-            foreach($flatten_dictionary as $key => $value) {
+            foreach($new_flatten_dictionary as $key => $value) {
                 if (!empty($value)) {
                     $null_less_dictionary[$key] = $value;
                 }
@@ -148,7 +156,7 @@
     // Example: [key1 -> value1, key2 -> [key3 -> value3]] ===> key1 -> value1 / key2_key3 -> value3
     function flatten_list($list, $prefix, $resulting_dictionary) {
 
-        $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAknowledgeable', 'isFederal', '_id');
+        $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAcknowledgeable', '_isAcknowledgement', 'isFederal', '_id');
 
         foreach ($list as $key => $value) {
             if (is_array($value)) {
