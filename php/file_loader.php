@@ -1,8 +1,14 @@
 <?php
+
+    function test($file) {
+        echo $file;
+    }
+
+
     //METHOD TO WRITE DATA FROM THE DB TO THE FILE 'output.csv'
 
-    /*
-    $myfile = fopen("output.xlsx", "w");
+    
+    /*$myfile = fopen("output.xlsx", "w");
     $sql = "SELECT * FROM People";
 
     $result = mysqli_query($conn, $sql);
@@ -20,6 +26,6 @@
     } catch (mysqli_sql_exception $e) {
         $error = $e->getMessage();
         echo $error;
-    }
-    */
+    }*/
+ 
 ?>

@@ -1,0 +1,18 @@
+{
+    "name": "debian/php_website",
+    "autoload": {
+        "psr-4": {
+            "Debian\\PhpWebsite\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "guardina",
+            "email": "guardinialex@gmail.com"
+        }
+    ],
+    "require": {
+        "phpoffice/phpspreadsheet": "^2.0",
+        "guzzlehttp/guzzle": "^7.0"
+    }
+}

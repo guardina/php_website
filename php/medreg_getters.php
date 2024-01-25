@@ -3,7 +3,7 @@
     include "name_mapper.php";
 
 
-    function get_data_from_gln($gln, $register) {
+    function get_medreg_data_by_gln($gln, $register) {
 
         $url = "";
         $payload = "";

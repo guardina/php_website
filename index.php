@@ -3,6 +3,12 @@
     include "php/file_loader.php";
     include "php/medreg_getters.php";
     include "php/refdata_getters.php";
+    include "php/temp.php";
+
+    use Phppot\DataSource;
+    use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+
+    require  ('vendor/autoload.php');
 ?>
 
 
@@ -17,9 +23,7 @@
 
 <?php
     // Variables for the form
-    $firstNameErr = $lastNameErr = $ageErr = $glnErr = "";
     $firstName = $lastName = $gln = $inputFile = "";
-    $age = 0;
 ?>
 
 
@@ -28,22 +32,17 @@
 
 <!-- Form to input data or search inside DB -->
 <form method="post">  
-    <p><span class="error">* required field</span></p>
     First Name: <input type="text" name="firstName" value="<?php echo $firstName;?>">
-    <span class="error">* <?php echo $firstNameErr;?></span>
     <br><br>
     Last Name: <input type="text" name="lastName" value="<?php echo $lastName;?>">
-    <span class="error">* <?php echo $lastNameErr;?></span>     
     <br><br>
-    Age: <input type="number" min="0" max="100" name="age" value="<?php echo $age;?>">
-    <span class="error">* <?php echo $ageErr;?></span>
-    <br><br>
-    GLN: <input type="text" name="gln" value="<?php echo $gln;?>">
-    <span class="error">* <?php echo $glnErr;?></span>
-    <br><br>
-
     <div style="display: flex; gap: 50px;">
-        <input type="submit" class="button" name="search_gln" value="Search GLN">
+        GLN: <input type="text" name="gln" value="<?php echo $gln;?>">
+        <input type="submit" class="button" name="get_from_DB" value="Search">
+    </div>
+    <br><br>
+    <div style="display: flex; gap: 50px;">
+        <input type="submit" class="button" name="search_gln_medreg" value="Search GLN (Medreg)">
         <select name="language" class="button" id="language">
 	        <option value="">--- Choose a language ---</option>
 	        <option value="De">Deutsch</option>
@@ -52,6 +51,8 @@
             <option value="En">English</option>
         </select>
     </div>
+    <br><br>
+    <input type="submit" class="button" name="search_gln_refdata" value="Search GLN (Refdata)">
 
 </form> 
 
@@ -151,40 +152,28 @@
 
 <?php
     
-    if (empty($_POST["firstName"])) {
-        $firstNameErr = "First name is required";
-    } else {
+    if (!empty($_POST["firstName"])) {
         $firstName = test_input($_POST["firstName"]);
     }
 
-    if (empty($_POST["lastName"])) {
-        $lastNameErr = "Last name is required";
-    } else {
+    if (!empty($_POST["lastName"])) {
         $lastName = test_input($_POST["lastName"]);
     }
 
-    if (empty($_POST["age"])) {
-        $ageErr = "Age is required";
-    } else {
-        $age = test_input($_POST["age"]);
-    }
-
-    if (empty($_POST["gln"])) {
-        $glnErr = "GLN is required";
-    } else {
+    if (!empty($_POST["gln"])) {
         $gln = test_input($_POST["gln"]);
     }
 
 
     if($_SERVER['REQUEST_METHOD'] == "POST")
     {
-        if (isset($_POST['search_gln'])) {
+        if (isset($_POST['search_gln_medreg'])) {
             if ($gln != "") {
                 foreach(['medreg', 'psyreg', 'betreg'] as $register) {
 
                     echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
 
-                    $data = get_data_from_gln("$gln", $register);
+                    $data = get_medreg_data_by_gln("$gln", $register);
 
                     $language = filter_input(INPUT_POST, 'language', FILTER_SANITIZE_STRING);
 
@@ -204,6 +193,36 @@
             } else {
                 echo '<p class="error">Error! Invalid gln.</p>';
             } 
+
+        } else if (isset($_POST['search_gln_refdata'])) {
+            if ($gln != "") {
+                echo '<br>Search gln [' . $gln . '] :<br><br>';
+
+                downloadAll();
+            } else {
+                echo '<p class="error">Error! Invalid gln.</p>';
+            }
+
+        } else if (isset($_POST['get_from_DB'])) {
+            if ($firstName == "" && $lastName == "" && $gln == "") {
+                echo '<p class="error">Insert first name, last name or gln for a correct search!</p>';
+            } else {
+                $data = array();
+                
+                if ($firstName != "") {
+                    $data['firstName'] = $firstName;
+                }
+
+                if ($lastName != "") {
+                    $data['lastName'] = $lastName;
+                }
+
+                if ($gln != "") {
+                    $data['gln'] = $gln;
+                }
+
+                get_entry($data);
+            }
         }
     }
 

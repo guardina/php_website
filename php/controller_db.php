@@ -17,6 +17,83 @@
 
 
 
+    function add_entry($data) {
+        $conn = connect_to_db("stammdaten_gln");
+    }
+
+
+    function get_entry($data) {
+
+        $firstName = $data['firstName'];
+        $lastName = $data['lastName'];
+        $gln = intval($data['gln']);
+
+        $conn = connect_to_db("stammdaten_gln");
+
+        $query = "SELECT * FROM med_gln m
+                  /*INNER JOIN med_languages l
+                  INNER JOIN med_permissionaddress pa
+                  INNER JOIN med_permissions pe
+                  INNER JOIN med_privatelawcettitles pl
+                  INNER JOIN med_professions pr*/
+                  WHERE 1";
+
+        if ($firstName != null) {
+            $query .= ' AND m.firstName = ?';
+        }
+
+        if ($lastName != null) {
+            $query .= ' AND m.lastName = ?';
+        }
+
+        if ($gln != null) {
+            $query .= ' AND m.gln = ?';
+        }
+
+        $query .= " ORDER BY m.effective_dt DESC LIMIT 1";
+
+        $newQuery = mysqli_prepare($conn, $query);
+
+        if ($firstName !== null) {
+            mysqli_stmt_bind_param($newQuery, 's', $firstName);
+        }
+    
+        if ($lastName !== null) {
+            mysqli_stmt_bind_param($newQuery, 's', $lastName);
+        }
+    
+        if ($gln !== null) {
+            mysqli_stmt_bind_param($newQuery, 'i', $gln);
+        }
+
+        mysqli_stmt_execute($newQuery);
+        $result = mysqli_stmt_get_result($newQuery);
+
+        $resultsArray = mysqli_fetch_all($result, MYSQLI_ASSOC);
+
+        mysqli_stmt_close($newQuery);
+        mysqli_close($conn);
+
+        foreach ($resultsArray as $res) {
+            foreach($res as $k => $v) {
+                echo $k . ' -> ' . $v . '<br>';
+            }
+        }
+                  
+    }
+
+
+    function update_entry($data) {
+        $conn = connect_to_db("stammdaten_gln");
+    }
+
+
+    function delete_entry($data) {
+        $conn = connect_to_db("stammdaten_gln");
+    }
+
+
+
 
     // Function to retrieve all glns contained in the stammdaten_gln DB, specifically from the tables med_gln and psy_gln
     function get_glns($type) {
