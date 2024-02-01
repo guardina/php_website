@@ -179,7 +179,7 @@
 
                     foreach($data as $k => $v) {
                         if (check_language($k, $language)){
-                            echo $k . ' ' . $v . '<br>';
+                            echo $k . ': ' . $v . '<br>';
                         }
                     }
 

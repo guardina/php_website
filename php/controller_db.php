@@ -2,7 +2,7 @@
     // CONNECTION TO DB
     function connect_to_db($databasename) {
         $servername = "localhost";
-        $username = "debian";
+        $username = "alex";
         $password = "password";
 
         $conn = mysqli_connect($servername, $username, $password, $databasename);
