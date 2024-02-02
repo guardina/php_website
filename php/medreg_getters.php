@@ -1,6 +1,7 @@
 <?php
 
     include "name_mapper.php";
+    use GuzzleHttp\Client;
 
 
     function get_medreg_data_by_gln($gln, $register) {
@@ -50,75 +51,61 @@
         }
         
 
-
-        $ch = curl_init();
+        $client = new Client();
     
 
         // Extra options to add to the request (api-key is necessary to obtain the JSON response)
-        $options = array (
-                        "Accept: application/json, text/plain, */*"
-            ,           "Accept-Encoding: gzip, deflate, br"
-            ,           "Accept-Language: en-CH; en"
-            ,           "api-key: AB929BB6-8FAC-4298-BC47-74509E45A10B"
-            ,           "Connection: keep-alive"
-            ,           "Content-Type: application/json"
-            ,           "Host: www.healthreg-public.admin.ch"
-            ,           "Origin: https://www.healthreg-public.admin.ch"
-            ,           "Referer: https://www.healthreg-public.admin.ch/$register/search"
-            ,           "Sec-Fetch-Dest: empty"
-            ,           "Sec-Fetch-Mode: cors"
-            ,           "Sec-Fetch-Site: same-origin"
-            ,           "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
-        );
+        $options = [
+            'headers' => [
+                'Accept' => 'application/json, text/plain, */*',
+                'Accept-Encoding' => 'gzip, deflate, br',
+                'Accept-Language' => 'en-CH; en',
+                'api-key' => 'AB929BB6-8FAC-4298-BC47-74509E45A10B',
+                'Connection' => 'keep-alive',
+                'Content-Type' => 'application/json',
+                'Host' => 'www.healthreg-public.admin.ch',
+                'Origin' => 'https://www.healthreg-public.admin.ch',
+                'Referer' => "https://www.healthreg-public.admin.ch/$register/search",
+                'Sec-Fetch-Dest' => 'empty',
+                'Sec-Fetch-Mode' => 'cors',
+                'Sec-Fetch-Site' => 'same-origin',
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
+                //"User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
+            ],
+        ];
 
+        $response = $client->post($url, ['json' => $payload, 'headers' => $options['headers']]);
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $options);
-
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    
-
-        $output = curl_exec($ch);
-        $result = json_decode($output, true);
+        $result = json_decode($response->getBody(), true);
 
         $id = $result['entries'][0]['id'];
 
-        $full_data_payload = array('id' => $id);
+        if ($id == null) {
+            return null;
+        }
+
+        $full_data_payload = ['id' => $id];
+    
 
 
         if (in_array($register, ['medreg', 'psyreg'])) {
             $full_data_url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($full_data_payload));
+            $response = $client->post($full_data_url, ['json' => $full_data_payload, 'headers' => $options['headers']]);
         } else if ($register == 'betreg') {
-            curl_setopt($ch, CURLOPT_POST, 0);
-            $full_data_url = "https://www.healthreg-public.admin.ch/api/betreg/public/company/" . $id;
+            if ($id == null) {
+                return null;
+            }
+            $full_data_url = "https://www.healthreg-public.admin.ch/api/betreg/public/company/$id";
+            $response = $client->get($full_data_url, ['headers' => $options['headers']]);
         }
 
-        curl_setopt($ch, CURLOPT_URL, $full_data_url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $options);
-
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-
-        $full_output = curl_exec($ch);
-        $full_result = json_decode($full_output, true);
-
+        $full_result = json_decode($response->getBody(), true);
 
         $null_less_dictionary = array();
         
-        if ($full_output === false) {
-            echo "Error: " . curl_error($ch);
+        if ($full_result === false) {
+            echo "Error: ";
         } else {
-
-            $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-            if ($http_status < 200 || $http_status >= 300) {
-                return null;
-            }
-
 
             $flatten_dictionary = flatten_list($full_result, '', array());
 
@@ -131,11 +118,11 @@
             }
             
 
-            /*foreach($new_flatten_dictionary as $k => $v) {
+            foreach($new_flatten_dictionary as $k => $v) {
                 if (!empty($v)){
                     echo $k . ':     ' . $v . '<br>';
                 }
-            }*/
+            }
 
             // From the initial dictionary, we only extract the pairs key-value that actually have a value stored, as we cannot add empty values to a SQL table
             foreach($new_flatten_dictionary as $key => $value) {
@@ -144,8 +131,6 @@
                 }
             }
         }
-
-        curl_close($ch);
 
         return $null_less_dictionary;
     }

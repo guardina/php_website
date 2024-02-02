@@ -13,6 +13,8 @@
     ],
     "require": {
         "phpoffice/phpspreadsheet": "^2.0",
-        "guzzlehttp/guzzle": "^7.0"
+        "guzzlehttp/guzzle": "^7.0",
+        "symfony/dom-crawler": "^7.0",
+        "symfony/css-selector": "^7.0"
     }
 }

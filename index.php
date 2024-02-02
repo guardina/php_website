@@ -145,9 +145,38 @@
 </html>
 
 
+<form method="post">
+    <input type="submit" class="button" name="get_all_glns" value="Dowload">
+    <br><br>
+</html>
+
+<html>
+    <br><br>
+</html>
+
+
 <!------------------------------------------------------- PHP ---------------------------------------------------------------------->
 
 
+<?php
+    function print_info($gln, $data, $register) {
+
+        echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
+
+        $language = filter_input(INPUT_POST, 'language', FILTER_SANITIZE_STRING);
+
+        if (empty($data)) {
+            echo '<p class="error">Couldn\'t find data for the provided gln.</p>';
+            return;
+        }
+
+        foreach($data as $k => $v) {
+            if (check_language($k, $language)){
+                echo $k . ': ' . $v . '<br>';
+            }
+        }
+    }
+?>
 
 
 <?php
@@ -170,23 +199,9 @@
         if (isset($_POST['search_gln_medreg'])) {
             if ($gln != "") {
                 foreach(['medreg', 'psyreg', 'betreg'] as $register) {
-
-                    echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
-
                     $data = get_medreg_data_by_gln("$gln", $register);
 
-                    $language = filter_input(INPUT_POST, 'language', FILTER_SANITIZE_STRING);
-
-                    foreach($data as $k => $v) {
-                        if (check_language($k, $language)){
-                            echo $k . ': ' . $v . '<br>';
-                        }
-                    }
-
-                    if (empty($data)) {
-                        echo '<p class="error">Couldn\'t find data for the provided gln.</p>';
-                        continue;
-                    }
+                    print_info($gln, $data, $register);
                 }
 
                 
@@ -223,6 +238,28 @@
 
                 get_entry($data);
             }
+        } else if (isset($_POST['get_all_glns'])) {
+            $curr_gln = 7601000090171;
+            //$number_of_tries = 20;
+            $glns_to_find = 5;
+
+            while ($glns_to_find > 0 /*&& $number_of_tries > 0*/) {
+                $gln_found = false;
+                foreach(['medreg', 'psyreg', 'betreg'] as $register) {
+                    $data = get_medreg_data_by_gln("$curr_gln", $register);
+
+                    if (!empty($data)) {
+                        print_info("$curr_gln", $data, $register);
+                        if (!$gln_found) {
+                            $gln_found = true;
+                            $glns_to_find--;
+                        }
+                    }
+                }
+                $curr_gln++;
+                //$number_of_tries--;
+                echo "<br>";
+            } 
         }
     }
 
