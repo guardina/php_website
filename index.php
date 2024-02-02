@@ -239,7 +239,7 @@
                 get_entry($data);
             }
         } else if (isset($_POST['get_all_glns'])) {
-            $curr_gln = 7601000090171;
+            $curr_gln = 7601000000019;
             //$number_of_tries = 20;
             $glns_to_find = 5;
 

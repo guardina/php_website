@@ -26,7 +26,7 @@
 
 
         // Create cURL handles for each request
-        for ($i = 0; $i < 1000; $i++) {
+        for($i = 0; $i < 200000; $i++) {
             $ch = curl_init($url);
             $options = [
                 CURLOPT_RETURNTRANSFER => true,
@@ -71,27 +71,31 @@
 
     // Example usage
     $url = 'https://www.healthreg-public.admin.ch/api/medreg/public/person';
-    $payloads = [];
-    $start_address = 22800;
+    $payloads = [['id' => 179052], ['id' =>  22883]];
 
-    for ($i = $start_address; $i<$start_address + 1000; $i++) {
+    $payloads = [];
+
+    for ($i = 0; $i<200000; $i++) {
         $payloads[] = ['id' => $i];
     }
-    
+
     $start_time = microtime(true);
     $results = makeParallelRequests($url, $payloads);
     $end_time = microtime(true);
 
     $total_time = $end_time - $start_time;
 
-    echo "Execution time: {$total_time} seconds\n";
 
+    $total = 0;
     // Handle the results
     foreach ($results as $result) {
         if ($result !== null) {
             print_r($result['name'] . "\n");
+            $total++;
         } else {
             ;//echo "Error making one of the requests.\n";
         }
-}
+    }
+
+    echo "TOTAL:" . $total . " in {$total_time} seconds \n";
 ?>
