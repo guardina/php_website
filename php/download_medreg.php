@@ -77,12 +77,14 @@
     }
 
 
+    // NEED TO CHANGE / DELETE
     function format_name($string) {
         $lowercase_string = strtolower($string);
         return ucfirst($lowercase_string);
     }
 
 
+    // NEED TO CHANGE / DELETE
     function already_exists_in_db($conn, $register, $id) {
         $select_query = "SELECT id from " . substr($register, 0, -3) . "_ids WHERE id=$id";
         $result = mysqli_query($conn, $select_query);
@@ -92,64 +94,12 @@
 
 
 
-    function check_data_again($register, $number_of_samples, $buckets_to_check) {
-        $conn = connect_to_db("stammdaten_gln");
 
-        global $requests_per_bucket;
-
-        $url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
-        $bucket = 1;
-        $total = 0;
-
-        if (in_array($bucket, $buckets_to_check)) {
-            echo "Rechecking bucket $bucket\n";
-            for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
-                $payloads = [];
-                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
-                    $payloads[] = ['id' => $j];
-                }   
-                
-    
-                $start_time = microtime(true);
-                $results = makeParallelRequests($url, $payloads);
-                $end_time = microtime(true);
-    
-                $total_time = $end_time - $start_time;
-
-                $curr_id = $i;
-    
-                foreach ($results as $result) {
-    
-                    $query = "INSERT INTO substr($register, 0, -3)_ids (round_2) VALUES (";
-    
-                    if ($result !== null) {
-                        $query .= "1)";
-                    } else {
-                        $query .= "0)";
-                    }
-
-                    $query .= " WHERE id = $curr_id";
-    
-                    $conn->query($query);
-
-                    $curr_id++;
-                }
-    
-                $bucket++;
-    
-                echo "\n\nTime elapsed: " . $total_time . "\n\n";
-            }
-        }
-
-        mysqli_close($conn);
-    }
-
-
-
-
-    function check_ids($register, $number_of_samples) {
+    function download_all_medreg_data($register, $number_of_samples) {
 
         $conn = connect_to_db("stammdaten_gln");
+
+        $existing_ids = get_existing_ids($register);
 
         global $requests_per_bucket;
 
@@ -159,16 +109,11 @@
         $bucket_to_check_again = [];
 
         for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
-            echo "[Bucket $bucket] Starting id check!\n";
-            if (already_exists_in_db($conn, $register, $i)) {
-                echo "[Bucket $bucket] Already present in database\n\n";
-                $bucket++;
-                continue;
-            }
+            echo "[Bucket $bucket] Starting data download!\n";
 
             $payloads = [];
             for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
-                $payloads[] = ['id' => $j];
+                $payloads[] = ['id' => $existing_ids[$j]];
             }   
             
 
@@ -178,12 +123,14 @@
 
             $total_time = $end_time - $start_time;
 
-            $curr_id = $i;
-            $empty_results = 0;
+            //$curr_id = $i;
+            $count = 0;
 
             foreach ($results as $result) {
 
                 // HERE WE CAN TAKE THE DATA, AS RESULT HAS FIRST NAME, LAST NAME, AND SO ON
+
+                $curr_id = $existing_ids[$count++];
 
                 $query = "INSERT INTO " . substr($register, 0, -3) . "_ids(id, bucket, round_1) VALUES ($curr_id, $bucket, ";
 
