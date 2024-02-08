@@ -3,7 +3,7 @@
     include "php/file_loader.php";
     include "php/medreg_getters.php";
     include "php/refdata_getters.php";
-    include "php/temp.php";
+    //include "download_ids.php";
 
     use Phppot\DataSource;
     use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
@@ -146,7 +146,7 @@
 
 
 <form method="post">
-    <input type="submit" class="button" name="get_all_glns" value="Dowload">
+    <input type="submit" class="button" name="get_all_glns" value="Download">
     <br><br>
 </html>
 
@@ -164,6 +164,10 @@
         echo '<br>Search gln [' . $gln . '] for register ' . $register . ':<br><br>';
 
         $language = filter_input(INPUT_POST, 'language', FILTER_SANITIZE_STRING);
+
+        if ($language == "") {
+            $language = "De";
+        }
 
         if (empty($data)) {
             echo '<p class="error">Couldn\'t find data for the provided gln.</p>';
@@ -283,7 +287,7 @@
     // $language = Fr:
     // $key = genderFr => True / $key = genderDe => false / $key = firstName => true
     function check_language($key, $language) {
-        if (preg_match('/(?:De|Fr|It|En)$/', $key) && preg_match('/^[a-z]+'.$language.'$/', $key)) {
+        if (preg_match('/(?:De|Fr|It|En)$/', $key) && preg_match('/[a-z]+'.$language.'$/', $key)) {
             return true;    
         } else if (!preg_match('/(?:De|Fr|It|En)$/', $key)) {
             return true; 

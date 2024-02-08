@@ -16,12 +16,6 @@
     }
 
 
-
-    function add_entry($data) {
-        $conn = connect_to_db("stammdaten_gln");
-    }
-
-
     function get_entry($data) {
 
         $firstName = $data['firstName'];
@@ -83,18 +77,6 @@
     }
 
 
-    function update_entry($data) {
-        $conn = connect_to_db("stammdaten_gln");
-    }
-
-
-    function delete_entry($data) {
-        $conn = connect_to_db("stammdaten_gln");
-    }
-
-
-
-
     // Function to retrieve all glns contained in the stammdaten_gln DB, specifically from the tables med_gln and psy_gln
     function get_glns($type) {
 
@@ -115,6 +97,28 @@
 
         return $glns;
     }
+
+
+
+    function get_existing_ids($register) {
+        $conn = connect_to_db("stammdaten_gln");
+
+        $query = "SELECT id FROM " . substr($register, 0, -3) . "_ids WHERE round_1 = 1 OR round_2 = 1";
+
+        $existing_ids = [];
+
+        $result = mysqli_query($conn, $query);
+        if (mysqli_num_rows($result) > 0) {
+            while ($row = mysqli_fetch_assoc($result)) {
+                $existing_ids[] = $row['id'];
+            }
+        }     
+
+        mysqli_close($conn);
+
+        return $existing_ids;
+    }
+
 
     // TAKES 2 DICTIONARIES: FIRST IT MAPS THE SCRAPED NAMES TO DB NAMES, THEN ISERTS THEM INTO THE DB<
 
