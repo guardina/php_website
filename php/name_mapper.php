@@ -48,7 +48,8 @@
             } else {
                 $newKey = $key;
             }
-            $newDictionary[$newKey] = $value;
+            //$newDictionary[$newKey] = $value;
+            $newDictionary[remove_extra($newKey)] = $value;
         }   
 
         return $newDictionary;
@@ -58,9 +59,11 @@
     // Function to remove extra wording when scraping information online (E.g. professions_0_profession_textIt => professionIt)
     function remove_extra($word) {
         $newWord = preg_replace('/nationalities_[0-9]/', 'nationality', $word);
-        $newWord = preg_replace('/phoneNumbers_[0-9]/', 'phoneNumber', $word);
+        $newWord = preg_replace('/phoneNumbers_0/', 'phoneNumber1', $newWord);
+        $newWord = preg_replace('/phoneNumbers_1/', 'phoneNumber2', $newWord);
+        $newWord = preg_replace('/phoneNumbers_2/', 'phoneNumber3', $newWord);
 
-        $patterns = array('/_text/', '/Skills_[0-9]/', '/.*[0-9]_*/');
+        $patterns = array('/_text/', '/Skills_[0-9]/', '/.*[0-9]_+/');
         return preg_replace($patterns, '', $newWord);
     }
 

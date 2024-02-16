@@ -1,6 +1,7 @@
 <?php
 
-    include_once "php/controller_db.php";
+    include_once "controller_db.php";
+    include "name_mapper.php";
 
     $requests_per_bucket = 100;
 
@@ -93,6 +94,44 @@
     }
 
 
+    function flatten_list($list, $prefix, $resulting_dictionary) {
+
+        $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAcknowledgeable', '_isAcknowledgement', 'isFederal', '_id');
+
+        foreach ($list as $key => $value) {
+            if (is_array($value)) {
+                $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary);
+            } else {
+                $ignore = false;
+                $string = $prefix . $key;
+                foreach($list_rejected as $substring) {
+                    if (strpos($string, $substring) !== false) {
+                        $ignore = true;
+                        break;
+                    }
+                }
+
+                if (!$ignore) {
+                    $resulting_dictionary[$string] = $value;
+                }
+            }
+        }
+        return $resulting_dictionary;
+    }
+
+
+
+
+    function get_entries_by_names($list, $names) {
+        $entries = array();
+
+        foreach($names as $name) {
+            $entries[] = $list[$name];
+        }
+
+        return $entries;
+    }
+
 
 
     function download_all_medreg_data($register, $number_of_samples) {
@@ -106,7 +145,6 @@
         $url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
         $bucket = 1;
         $total = 0;
-        $bucket_to_check_again = [];
 
         for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
             echo "[Bucket $bucket] Starting data download!\n";
@@ -123,25 +161,133 @@
 
             $total_time = $end_time - $start_time;
 
-            //$curr_id = $i;
             $count = 0;
 
             foreach ($results as $result) {
 
                 // HERE WE CAN TAKE THE DATA, AS RESULT HAS FIRST NAME, LAST NAME, AND SO ON
 
+                $flatten_result = flatten_list($result, '', array());
+                $flatten_result = map_names($flatten_result, $register);
+
                 $curr_id = $existing_ids[$count++];
 
-                $query = "INSERT INTO " . substr($register, 0, -3) . "_ids(id, bucket, round_1) VALUES ($curr_id, $bucket, ";
+
+                $med_gln_keys = array("gln", "lastName", "firstName", "genderDe", "genderFr", "genderIt", "genderEn", "yearOfBirth", "uid", "hasPermission", "hasProvider90Days");
+                $med_permissionaddress_keys = array("gln", "professionEn", "dateDecision", "practiceCompanyName", "streetWithNumber", "zipCity", "zip", "city", "phoneNumber1", "phoneNumber2", "phoneNumber3", "faxnumber", "uid", "selfDispensationEn", "permissionBtmEn");
+                $med_permissions_keys = array("gln", "professionEn", "permissionTypeDe", "permissionTypeFr", "permissionTypeIt", "permissionTypeEn", "permissionStateDe", "permissionStateFr", "permissionStateIt", "permissionStateEn", "permissionActivityStateDe", "permissionActivityStateFr", "permissionActivityStateIt", "permissionActivityStateEn", "cantonDe", "cantonFr", "cantonIt", "cantonEn", "dateDecision", "dateActivity", "restrictions");
+                $med_languages_keys = array("gln", "languageDe", "languageFr", "languageIt", "languageEn");
+                $med_nationalities_keys = array("gln", "nationalityDe", "nationalityFr", "nationalityIt", "nationalityEn");
+                $med_cettitles_keys = array("gln", "professionEn", "cetTitleTypeDe", "cetTitleTypeFr", "cetTitleTypeIt", "cetTitleTypeEn", "cetTitleKindDe", "cetTitleKindFr", "cetTitleKindit", "cetTitleKindEn", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "issuanceDate", "dateMebeko");
+                $med_privatelawcettitles_keys = array("gln", "professionEn", "privateLawCetTitleTypeDe", "privateLawCetTitleTypeFr", "privateLawCetTitleTypeIt", "privateLawCetTitleTypeEn", "privateLawCetTitleKindDe", "privateLawCetTitleKindFr", "privateLawCetTitleKindIt", "privateLawCetTitleKindEn", "issuanceDate");
+
+
+
+
+
+                // Query for med_gln
+                $entries = get_entries_by_names($flatten_result, $med_gln_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_gln(gln, lastName, firstname, genderDe, genderFr, genderIt, genderEn, yearOfBirth, uid, hasPermission, hasProvider90Days) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n";
+
+
+                // Query for med_permissionaddress
+                $entries = get_entries_by_names($flatten_result, $med_permissionaddress_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_permissionaddress(gln, professionEn, dateDecision, practiceCompanyName, streetWithNumber, zipCity, zip, city, phoneNumber1, phoneNumber2, phoneNumber3, faxNumber, uid, selfDispensation, permissionBtm) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n";
+
+
+                // Query for med_permissions
+                $entries = get_entries_by_names($flatten_result, $med_permissions_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_permissions(gln, professionEn, permissionTypeDe, permissionTypeFr, permissionTypeIt, permissionTypeEn, permissionStateDe, permissionStateFr, permissionStateIt, permissionStateEn, permissionActivityStateDe, permissionActivityStateFr, permissionActivityStateIt, permissionActivityStateEn, cantonDe, cantonFr, cantonIt, cantonEn, dateDecision, dateActivity, restrictions) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n";
+
+
+                // Query for med_languages
+                $entries = get_entries_by_names($flatten_result, $med_languages_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_languages(gln, languageDe, languageFr, languageIt, languageEn) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n";
+
+
+                // Query for med_nationalities
+                $entries = get_entries_by_names($flatten_result, $med_nationalities_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_nationalities(gln, nationalityDe, nationalityFr, nationalityIt, nationalityEn) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n";
+
+
+                // Query for med_cettitles
+                $entries = get_entries_by_names($flatten_result, $med_cettitles_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_cettitles(gln, professionEn, titleTypeDe, titleTypeFr, titleTypeIt, titleTypeEn, titleKindDe, titleKindFr, titleKindIt, titleKindEn, issuanceCountryDe, issuanceCountryFr, issuanceCountryIt, issuanceCountryEn, issuanceDate, dateMebeko) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n";
+
+
+                // Query for med_privatelawcettitles
+                $entries = get_entries_by_names($flatten_result, $med_privatelawcettitles_keys);
+                $query = "";
+                if (count($entries) > 0) {
+                    $query = "INSERT INTO med_privatelawcettitles(gln, professionEn, titleTypeDe, titleTypeFr, titleTypeIt, titleTypeEn, titleKindDe, titleKindFr, titleKindIt, titleKindEn, issuanceDate) VALUES (" . implode(', ', $entries) . ")";
+                //$conn->query($query);
+                }
+        
+                echo $query . "\n\n\n\n";
+
+
+
+
+
+                /*foreach(get_entries_by_names($flatten_result, $med_gln_keys) as $v) {
+                    echo $v . "\n";
+                }
+                echo "\n\n\n";*/
+
+                /*foreach($flatten_result as $k => $v) {
+                    echo $k . ": " . $v . "\n";
+                }
+
+                echo "\n\n";*/
+
+
+
+
+                /*$query = "INSERT INTO " . substr($register, 0, -3) . "_ids(id, bucket, round_1) VALUES ($curr_id, $bucket, ";
 
                 if ($result !== null) {
                     $query .= "1)";
                 } else {
                     $query .= "0)";
-                    $empty_results++;
-                }
+                }*/
 
-                $conn->query($query);
+                //$conn->query($query);
 
                 $curr_id++;
             }
@@ -152,18 +298,7 @@
             $bucket++;
         }
 
-        $to_check_again_query = "SELECT bucket FROM " . substr($register, 0, -3) . "_ids GROUP BY bucket HAVING COUNT(round_1) = 0";
-        $result = mysqli_query($conn, $to_check_again_query);
-
-        if ($result->num_rows > 0) {
-            while ($row = $result->fetch_assoc()) {
-                echo $row . "\n";
-            }
-        }
-
         mysqli_close($conn);
-
-        check_data_again($register, $number_of_samples, $bucket_to_check_again);
     }
 
 
@@ -176,5 +311,5 @@
 
     $register = $argv[1];
     $number_of_samples = $argv[2];
-    check_ids($register, $number_of_samples);
+    download_all_medreg_data($register, $number_of_samples);
 ?>
