@@ -32,7 +32,7 @@ CREATE TABLE med_nationalities (
     ,   effective_dt        DATE DEFAULT current_date
     ,   expiry_dt           DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (gln, effective_dt, nationalityEn, expiry_dt)
+    ,   PRIMARY KEY (gln, effective_dt, expiry_dt)
     ,   FOREIGN KEY (gln, effective_dt, expiry_dt)
             REFERENCES med_gln (gln, effective_dt, expiry_dt)
             ON DELETE CASCADE
@@ -47,7 +47,7 @@ CREATE TABLE med_languages (
     ,   effective_dt        DATE DEFAULT current_date 
     ,   expiry_dt           DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (gln, effective_dt, languageEn, expiry_dt)
+    ,   PRIMARY KEY (gln, effective_dt, expiry_dt)
     ,   FOREIGN KEY (gln, effective_dt, expiry_dt)
             REFERENCES med_gln (gln, effective_dt, expiry_dt)
             ON DELETE CASCADE
