@@ -5,16 +5,19 @@
 
     $requests_per_bucket = 100;
 
+
+    // Function that will do more HTTP requests at the same time. All results are then gathered. The number of requests at the same time is defined in $requests_per_bucket
     function makeParallelRequests($url, $payloads) {
         global $requests_per_bucket; 
 
         $handles = [];
         $results = [];
 
-        // Initialize multi cURL handler
         $multiHandle = curl_multi_init();
 
 
+        // The most important header option to keep is the api-key; withouth that, the response will be empty.
+        // In case the request is empty even if the logic here is correct and the api-key is present, double check if the api-key was changed
         $headers = [
             'Accept' => 'application/json, text/plain, */*',
             'Accept-Encoding' => 'gzip, deflate, br',
@@ -28,8 +31,8 @@
             'Sec-Fetch-Dest' => 'empty',
             'Sec-Fetch-Mode' => 'cors',
             'Sec-Fetch-Site' => 'same-origin',
-            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
-            //"User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
+            //'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0'
+            "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
         ];
 
 
@@ -78,22 +81,42 @@
     }
 
 
-    // NEED TO CHANGE / DELETE
+    // Function that puts every first and last name in the correct format (first letter uppercase, the rest lowercase)
     function format_name($string) {
-        $lowercase_string = strtolower($string);
-        return ucfirst($lowercase_string);
+        $names = explode(' ', $string);
+    
+        foreach ($names as &$name) {
+            $lowercase_name = strtolower($name);
+            $name = ucfirst($lowercase_name);
+        }
+        unset($name);
+    
+        $formatted_string = implode(' ', $names);
+    
+        return $formatted_string;
     }
 
 
-    // NEED TO CHANGE / DELETE
+    function format_date($string) {
+        $dateObject = DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $string);
+
+        return $dateObject->format('Y-m-d H:i:s');
+    }
+
+
+    // Returns true if the provided id is present in the databse, such that we can avoid a bucket of requests. Only works when downloading the whole database the first time, as afterwards it could
+    // skip newly added ids. For instance, if it's checking the ids between 1 and 100, this function will only check if 1 is in the DB and assume also the other values up to 100 are in the DB 
+    // (if true is returned). If a new id 40 is added, it will not be checked. 
+    // The function is used in case there was some problem while downloading the first time and the process was halted; we avoid trying to redownload the whole database.
     function already_exists_in_db($conn, $register, $id) {
-        $select_query = "SELECT id from " . substr($register, 0, -3) . "_ids WHERE id=$id";
+        $select_query = "SELECT id from " . substr($register, 0, -3) . "_gln WHERE id=$id";
         $result = mysqli_query($conn, $select_query);
 
         return mysqli_num_rows($result) > 0;
     }
 
 
+    // Function used to create a 1-dimensional array of the downloaded data and remove nested arrays.
     function flatten_list($list, $prefix, $resulting_dictionary) {
 
         $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAcknowledgeable', '_isAcknowledgement', 'isFederal', '_id');
@@ -121,15 +144,43 @@
 
 
 
-
+    // $list can contain all possible keys and values obtainable from the MedReg website, this function returns only the selected keys (specified in $names)
     function get_entries_by_names($list, $names) {
         $entries = array();
 
         foreach($names as $name) {
-            $entries[] = $list[$name];
+            if (isset($list[$name]) && $list[$name] != "") {
+                if ($name == 'firstName' || $name == 'lastName') {
+                    $entries[$name] = format_name($list[$name]);
+                } else if (strpos(strtolower($name), 'date') !== false) {
+                    $entries[$name] = format_date($list[$name]);
+                } else if ($name == 'selfDispensationEn' || $name == 'permissionBtmEn') {
+                    $list[$name] = ($list[$name] == 'Yes' ? 1 : 0);
+                } else {
+                    $entries[$name] = $list[$name];
+                }
+            }
         }
 
         return $entries;
+    }
+
+
+    // Properly format strings and integers to be inserted inside a SQL table
+    function format_values($values) {
+        $formattedValue = "";
+        foreach($values as $value) {
+            if (is_numeric($value)) {
+                $formattedValue .= $value . ", ";
+            } else {
+                $value = str_replace('"', '\"', $value);
+                $formattedValue .= "\"" . $value . "\", ";
+            }
+        }
+
+        $formattedValue = rtrim($formattedValue, ", ") . "";
+
+        return $formattedValue;
     }
 
 
@@ -145,9 +196,21 @@
         $url = "https://www.healthreg-public.admin.ch/api/$register/public/person";
         $bucket = 1;
         $total = 0;
+        $count = 0;
 
         for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
             echo "[Bucket $bucket] Starting data download!\n";
+
+            $curr_id = $existing_ids[$count];
+
+
+            if (already_exists_in_db($conn, $register, $curr_id)) {
+                echo "[Bucket $bucket] Already present in database\n\n";
+                $bucket++;
+                $count+=100;
+                continue;
+            }
+
 
             $payloads = [];
             for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
@@ -161,8 +224,6 @@
 
             $total_time = $end_time - $start_time;
 
-            $count = 0;
-
             foreach ($results as $result) {
 
                 // HERE WE CAN TAKE THE DATA, AS RESULT HAS FIRST NAME, LAST NAME, AND SO ON
@@ -170,126 +231,133 @@
                 $flatten_result = flatten_list($result, '', array());
                 $flatten_result = map_names($flatten_result, $register);
 
-                $curr_id = $existing_ids[$count++];
-
 
                 $med_gln_keys = array("gln", "lastName", "firstName", "genderDe", "genderFr", "genderIt", "genderEn", "yearOfBirth", "uid", "hasPermission", "hasProvider90Days");
-                $med_permissionaddress_keys = array("gln", "professionEn", "dateDecision", "practiceCompanyName", "streetWithNumber", "zipCity", "zip", "city", "phoneNumber1", "phoneNumber2", "phoneNumber3", "faxnumber", "uid", "selfDispensationEn", "permissionBtmEn");
-                $med_permissions_keys = array("gln", "professionEn", "permissionTypeDe", "permissionTypeFr", "permissionTypeIt", "permissionTypeEn", "permissionStateDe", "permissionStateFr", "permissionStateIt", "permissionStateEn", "permissionActivityStateDe", "permissionActivityStateFr", "permissionActivityStateIt", "permissionActivityStateEn", "cantonDe", "cantonFr", "cantonIt", "cantonEn", "dateDecision", "dateActivity", "restrictions");
                 $med_languages_keys = array("gln", "languageDe", "languageFr", "languageIt", "languageEn");
                 $med_nationalities_keys = array("gln", "nationalityDe", "nationalityFr", "nationalityIt", "nationalityEn");
+                $med_professions_keys = array("gln", "professionDe", "professionFr", "professionIt", "professionEn", "diyplomaTypeDe", "diyplomaTypeFr", "diyplomaTypeIt", "diyplomaTypeEn", "issuanceDate", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "dateMebeko", "providers90Days", " hasPermissionOtherThanNoLicence");
+                $med_permissions_keys = array("gln", "professionEn", "permissionTypeDe", "permissionTypeFr", "permissionTypeIt", "permissionTypeEn", "permissionStateDe", "permissionStateFr", "permissionStateIt", "permissionStateEn", "permissionActivityStateDe", "permissionActivityStateFr", "permissionActivityStateIt", "permissionActivityStateEn", "cantonDe", "cantonFr", "cantonIt", "cantonEn", "dateDecision", "dateActivity", "restrictions");
+                $med_permissionaddress_keys = array("gln", "professionEn", "dateDecision", "practiceCompanyName", "streetWithNumber", "zipCity", "zip", "city", "phoneNumber1", "phoneNumber2", "phoneNumber3", "faxnumber", "uid", "selfDispensationEn", "permissionBtmEn");
                 $med_cettitles_keys = array("gln", "professionEn", "cetTitleTypeDe", "cetTitleTypeFr", "cetTitleTypeIt", "cetTitleTypeEn", "cetTitleKindDe", "cetTitleKindFr", "cetTitleKindit", "cetTitleKindEn", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "issuanceDate", "dateMebeko");
                 $med_privatelawcettitles_keys = array("gln", "professionEn", "privateLawCetTitleTypeDe", "privateLawCetTitleTypeFr", "privateLawCetTitleTypeIt", "privateLawCetTitleTypeEn", "privateLawCetTitleKindDe", "privateLawCetTitleKindFr", "privateLawCetTitleKindIt", "privateLawCetTitleKindEn", "issuanceDate");
-
-
 
 
 
                 // Query for med_gln
                 $entries = get_entries_by_names($flatten_result, $med_gln_keys);
                 $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_gln(gln, lastName, firstname, genderDe, genderFr, genderIt, genderEn, yearOfBirth, uid, hasPermission, hasProvider90Days) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
+                if (!empty($entries)) {
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_gln(id, " . implode(', ', $columns) . ") VALUES ($curr_id, $formattedValue)";
+                $conn->query($query);
                 }
-        
-                echo $query . "\n\n";
-
-
-                // Query for med_permissionaddress
-                $entries = get_entries_by_names($flatten_result, $med_permissionaddress_keys);
-                $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_permissionaddress(gln, professionEn, dateDecision, practiceCompanyName, streetWithNumber, zipCity, zip, city, phoneNumber1, phoneNumber2, phoneNumber3, faxNumber, uid, selfDispensation, permissionBtm) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
-                }
-        
-                echo $query . "\n\n";
-
-
-                // Query for med_permissions
-                $entries = get_entries_by_names($flatten_result, $med_permissions_keys);
-                $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_permissions(gln, professionEn, permissionTypeDe, permissionTypeFr, permissionTypeIt, permissionTypeEn, permissionStateDe, permissionStateFr, permissionStateIt, permissionStateEn, permissionActivityStateDe, permissionActivityStateFr, permissionActivityStateIt, permissionActivityStateEn, cantonDe, cantonFr, cantonIt, cantonEn, dateDecision, dateActivity, restrictions) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
-                }
-        
-                echo $query . "\n\n";
 
 
                 // Query for med_languages
                 $entries = get_entries_by_names($flatten_result, $med_languages_keys);
                 $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_languages(gln, languageDe, languageFr, languageIt, languageEn) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
+                if (!empty($entries)) {
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_languages(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                $conn->query($query);
                 }
-        
-                echo $query . "\n\n";
 
 
                 // Query for med_nationalities
                 $entries = get_entries_by_names($flatten_result, $med_nationalities_keys);
                 $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_nationalities(gln, nationalityDe, nationalityFr, nationalityIt, nationalityEn) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
+                if (!empty($entries)) {
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_nationalities(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                    $conn->query($query);
                 }
-        
-                echo $query . "\n\n";
 
 
-                // Query for med_cettitles
+                // Query for med_professions
+                $entries = get_entries_by_names($flatten_result, $med_professions_keys);
+                $query = "";
+                if (!empty($entries)) {
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_professions(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                    $conn->query($query);
+                }
+
+
+                // Query for med_permissions
+                $entries = get_entries_by_names($flatten_result, $med_permissions_keys);
+                $query = "";
+                if (!empty($entries)) {
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_permissions(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                $conn->query($query);
+                }
+
+
+                // Query for med_permissionAddress
+                $entries = get_entries_by_names($flatten_result, $med_permissionaddress_keys);
+                $query = "";
+                if (!empty($entries)) {
+                    $entries = map_names($entries, table_name : 'med_permissionAddress');
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_permissionAddress(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                $conn->query($query);
+                }
+
+
+                // Query for med_cetTitles
                 $entries = get_entries_by_names($flatten_result, $med_cettitles_keys);
                 $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_cettitles(gln, professionEn, titleTypeDe, titleTypeFr, titleTypeIt, titleTypeEn, titleKindDe, titleKindFr, titleKindIt, titleKindEn, issuanceCountryDe, issuanceCountryFr, issuanceCountryIt, issuanceCountryEn, issuanceDate, dateMebeko) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
+                if (!empty($entries)) {
+                    $entries = map_names($entries, table_name : 'med_cettitles');
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
+
+                    $formattedValue = format_values($values);
+
+                    $query = "INSERT INTO med_cetTitles(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                $conn->query($query);
                 }
-        
-                echo $query . "\n\n";
 
 
-                // Query for med_privatelawcettitles
+                // Query for med_privateLawCetTitles
                 $entries = get_entries_by_names($flatten_result, $med_privatelawcettitles_keys);
                 $query = "";
-                if (count($entries) > 0) {
-                    $query = "INSERT INTO med_privatelawcettitles(gln, professionEn, titleTypeDe, titleTypeFr, titleTypeIt, titleTypeEn, titleKindDe, titleKindFr, titleKindIt, titleKindEn, issuanceDate) VALUES (" . implode(', ', $entries) . ")";
-                //$conn->query($query);
-                }
-        
-                echo $query . "\n\n\n\n";
+                if (!empty($entries)) {
+                    $entries = map_names($entries, table_name : 'med_privatelawcettitles');
+                    $columns = array_keys($entries);
+                    $values = array_values($entries);
 
+                    $formattedValue = format_values($values);
 
-
-
-
-                /*foreach(get_entries_by_names($flatten_result, $med_gln_keys) as $v) {
-                    echo $v . "\n";
-                }
-                echo "\n\n\n";*/
-
-                /*foreach($flatten_result as $k => $v) {
-                    echo $k . ": " . $v . "\n";
+                    $query = "INSERT INTO med_privateLawCetTitles(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                $conn->query($query);
                 }
 
-                echo "\n\n";*/
-
-
-
-
-                /*$query = "INSERT INTO " . substr($register, 0, -3) . "_ids(id, bucket, round_1) VALUES ($curr_id, $bucket, ";
-
-                if ($result !== null) {
-                    $query .= "1)";
-                } else {
-                    $query .= "0)";
-                }*/
-
-                //$conn->query($query);
-
-                $curr_id++;
+                $curr_id = $existing_ids[$count++];
             }
 
 

@@ -83,7 +83,6 @@ CREATE TABLE med_professions (
 
 CREATE TABLE med_cetTitles (
         gln                 BIGINT UNSIGNED 
-    ,   title_nr            TINYINT UNSIGNED
     ,   professionEn        VARCHAR(50) 
     ,   titleTypeDe			VARCHAR(100)
     ,   titleTypeFr			VARCHAR(100)
@@ -102,7 +101,7 @@ CREATE TABLE med_cetTitles (
     ,   effective_dt        DATE DEFAULT current_date 
     ,   expiry_dt           DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn, title_nr)
+    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn)
     ,   FOREIGN KEY (gln, effective_dt, expiry_dt, professionEn)
             REFERENCES med_professions (gln, effective_dt, expiry_dt, professionEn)
             ON DELETE CASCADE
@@ -111,7 +110,6 @@ CREATE TABLE med_cetTitles (
 
 CREATE TABLE med_privateLawCetTitles (
         gln                 BIGINT UNSIGNED 
-    ,   pr_title_nr         TINYINT UNSIGNED
     ,   professionEn        VARCHAR(50) 
     ,   titleTypeDe         VARCHAR(100)
     ,   titleTypeFr         VARCHAR(100)
@@ -125,7 +123,7 @@ CREATE TABLE med_privateLawCetTitles (
     ,   effective_dt        DATE DEFAULT current_date 
     ,   expiry_dt           DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn, pr_title_nr)
+    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn)
     ,   FOREIGN KEY (gln, effective_dt, expiry_dt, professionEn)
             REFERENCES med_professions (gln, effective_dt, expiry_dt, professionEn)
             ON DELETE CASCADE
@@ -134,7 +132,6 @@ CREATE TABLE med_privateLawCetTitles (
 
 CREATE TABLE med_permissions (
         gln                         BIGINT UNSIGNED
-    ,   perm_nr                     TINYINT UNSIGNED
     ,   professionEn                VARCHAR(50) 
     ,   permissionTypeDe            VARCHAR(100)
     ,   permissionTypeFr            VARCHAR(100)
@@ -158,7 +155,7 @@ CREATE TABLE med_permissions (
     ,   effective_dt                DATE DEFAULT current_date 
     ,   expiry_dt                   DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn, perm_nr)
+    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn)
     ,   FOREIGN KEY (gln, effective_dt, expiry_dt, professionEn)
             REFERENCES med_professions (gln, effective_dt, expiry_dt, professionEn)
             ON DELETE CASCADE
@@ -168,8 +165,6 @@ CREATE TABLE med_permissions (
 
 CREATE TABLE med_permissionAddress (
         gln                 BIGINT UNSIGNED
-    ,   perm_nr             TINYINT UNSIGNED
-    ,   addr_nr             TINYINT UNSIGNED
     ,   professionEn        VARCHAR(50)
     ,   dateDecision        DATETIME
     ,   practiceCompanyName VARCHAR(200)
@@ -187,144 +182,12 @@ CREATE TABLE med_permissionAddress (
     ,   effective_dt        DATE DEFAULT current_date 
     ,   expiry_dt           DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn, perm_nr, addr_nr)
-    ,   FOREIGN KEY (gln, effective_dt, expiry_dt, professionEn, perm_nr) 
-            REFERENCES med_permissions (gln, effective_dt, expiry_dt, professionEn, perm_nr) 
+    ,   PRIMARY KEY (gln, effective_dt, expiry_dt, professionEn)
+    ,   FOREIGN KEY (gln, effective_dt, expiry_dt, professionEn) 
+            REFERENCES med_permissions (gln, effective_dt, expiry_dt, professionEn) 
             ON DELETE CASCADE
             ON UPDATE CASCADE
 );
-
-
--- Create merged stammdaten tables view;
--- create or replace view med_logged_merged_v as (
---     select 
---             g.gln
---         ,   g.effective_dt as gln_effective_dt
---         ,   g.expiry_dt as gln_expiry_dt
---         ,   g.lastName        
---         ,   g.firstName                    
---         ,   g.genderDe
---         ,   g.genderFr
---         ,   g.genderIt 
---         ,   g.genderEn
---         ,   g.yearOfBirth
---         ,   g.uid         
---         ,   g.hasPermission
---         ,   g.hasProvider90Days
-
---         ,   l.effective_dt as lang_effective_dt
---         ,   l.expiry_dt as lang_expiry_dt
---         ,   l.languageDe 
---         ,   l.languageFr
---         ,   l.languageIt
---         ,   l.languageEn
-
---         ,   n.effective_dt as nat_effective_dt
---         ,   n.expiry_dt as nat_expiry_dt
---         ,   n.nationalityDe
---         ,   n.nationalityFr
---         ,   n.nationalityIt
---         ,   n.nationalityEn
-
---         ,   p.effective_dt as prof_effective_dt
---         ,   p.expiry_dt as prof_expiry_dt
---         ,   p.professionDe
---         ,   p.professionFr
---         ,   p.professionIt
---         ,   p.professionEn
---         ,   p.diplomaTypeDe as prof_diplomaTypeDe
---         ,   p.diplomaTypeFr as prof_diplomaTypeFr
---         ,   p.diplomaTypeIt as prof_diplomaTypeIt
---         ,   p.diplomaTypeEn as prof_diplomaTypeEn
---         ,   p.issuanceDate as prof_issuanceDate
---         ,   p.issuanceCountryDe as prof_issuanceCountryDe
---         ,   p.issuanceCountryFr as prof_issuanceCountryFr
---         ,   p.issuanceCountryIt as prof_issuanceCountryIt
---         ,   p.issuanceCountryEn as prof_issuanceCountryEn
---         ,   p.dateMebeko as prof_dateMebeko
---         ,   p.providers90Days as prof_providers90Days
---         ,   p.hasPermissionOtherThanNoLicence as prof_hasPermissionOtherThanNoLicence
-
---         ,   pe.effective_dt as perm_effective_dt
---         ,   pe.expiry_dt as perm_expiry_dt
---         ,   pe.perm_nr
---         ,   pe.permissionTypeDe as perm_TypeDe                                         
---         ,   pe.permissionTypeFr as perm_TypeFr                                          
---         ,   pe.permissionTypeIt as perm_TypeIt                                             
---         ,   pe.permissionTypeEn as perm_TypeEn                                                               
---         ,   pe.permissionStateDe as perm_StateDe
---         ,   pe.permissionStateFr as perm_StateFr    
---         ,   pe.permissionStateIt as perm_StateIt      
---         ,   pe.permissionStateEn as perm_StateEn
---         ,   pe.permissionActivityStateDe as perm_ActivityStateDe
---         ,   pe.permissionActivityStateFr as perm_ActivityStateFr
---         ,   pe.permissionActivityStateIt as perm_ActivityStateIt
---         ,   pe.permissionActivityStateEn as perm_ActivityStateEn
---         ,   pe.cantonDe as perm_cantonDe 
---         ,   pe.cantonFr as perm_cantonFr 
---         ,   pe.cantonIt as perm_cantonIt 
---         ,   pe.cantonEn as perm_cantonEn 
---         ,   pe.dateDecision as perm_dateDecision           
---         ,   pe.dateActivity as perm_dateActivity           
---         ,   pe.restrictions as perm_restrictions
-
---         ,   ct.effective_dt as cet_effective_dt
---         ,   ct.expiry_dt as cet_expiry_dt
---         ,   ct.title_nr
---         ,   ct.titleTypeDe as cet_titleTypeDe                        
---         ,   ct.titleTypeFr as cet_titleTypeFr            
---         ,   ct.titleTypeIt as cet_titleTypeIt                       
---         ,   ct.titleTypeEn as cet_titleTypeEn               
---         ,   ct.titleKindDe as cet_titleKindDe                                                      
---         ,   ct.titleKindFr as cet_titleKindFr                                                     
---         ,   ct.titleKindIt as cet_titleKindIt                                                  
---         ,   ct.titleKindEn as cet_titleKindEn                                                         
---         ,   ct.issuanceCountryDe as cet_issuanceCountryDe
---         ,   ct.issuanceCountryFr as cet_issuanceCountryFr
---         ,   ct.issuanceCountryIt as cet_issuanceCountryIt
---         ,   ct.issuanceCountryEn as cet_issuanceCountryEn
---         ,   ct.issuanceDate as cet_issuanceDate           
---         ,   ct.dateMebeko as cet_dateMebeko
-
---         ,   pl.effective_dt as plCet_effective_dt
---         ,   pl.expiry_dt as plCet_expiry_dt
---         ,   pl.pr_title_nr
---         ,   pl.titleTypeDe as plCet_titleTypeDe
---         ,   pl.titleTypeFr as plCet_titleTypeFr
---         ,   pl.titleTypeIt as plCet_titleTypeIt
---         ,   pl.titleTypeEn as plCet_titleTypeEn
---         ,   pl.titleKindDe as plCet_titleKindDe
---         ,   pl.titleKindFr as plCet_titleKindFr
---         ,   pl.titleKindIt as plCet_titleKindIt
---         ,   pl.titleKindEn as plCet_titleKindEn
---         ,   pl.issuanceDate as plCet_issuanceDate
-
---         ,   pa.effective_dt as perm_addr_effective_dt
---         ,   pa.expiry_dt as perm_addr_expiry_dt
---         ,   pa.addr_nr
---         ,   pa.dateDecision as perm_addr_dateDecision
---         ,   pa.practiceCompanyName as perm_addr_practiceCompanyName                                        
---         ,   pa.streetWithNumber as perm_addr_streetWithNumber               
---         ,   pa.zipCity as perm_addr_zipCity                              
---         ,   pa.zip as perm_addr_zip  
---         ,   pa.city as perm_addr_city                               
---         ,   pa.phoneNumber1 as perm_addr_phoneNumber1  
---         ,   pa.phoneNumber2 as perm_addr_phoneNumber2
---         ,   pa.phoneNumber3 as perm_addr_phoneNumber3
---         ,   pa.faxNumber as perm_addr_faxNumber        
---         ,   pa.uid as perm_addr_uid
---         ,   pa.selfDispensation as perm_addr_selfDispensation
---         ,   pa.permissionBtm as perm_addr_permissionBtm
-
---     from med_gln g
---         left join med_languages l               using (gln, effective_dt, expiry_dt)
---         left join med_nationalities n           using (gln, effective_dt, expiry_dt)
---         left join med_professions p             using (gln, effective_dt, expiry_dt)
---         left join med_permissions pe            using (gln, effective_dt, expiry_dt, professionEn)
---         left join med_cetTitles ct              using (gln, effective_dt, expiry_dt, professionEn)
---         left join med_privateLawCetTitles pl    using (gln, effective_dt, expiry_dt, professionEn)
---         left join med_permissionAddress pa      using (gln, effective_dt, expiry_dt, professionEn, perm_nr)
--- );
 
 
 -- Create merged stammdaten tables view without effective/expiry 
@@ -370,7 +233,6 @@ create or replace view med_effective_merged_nodate_v as (
         ,   p.providers90Days as prof_providers90Days
         ,   p.hasPermissionOtherThanNoLicence as prof_hasPermissionOtherThanNoLicence
 
-        ,   pe.perm_nr
         ,   pe.permissionTypeDe as perm_TypeDe                                         
         ,   pe.permissionTypeFr as perm_TypeFr                                          
         ,   pe.permissionTypeIt as perm_TypeIt                                             
@@ -391,7 +253,6 @@ create or replace view med_effective_merged_nodate_v as (
         ,   pe.dateActivity as perm_dateActivity           
         ,   pe.restrictions as perm_restrictions
 
-        ,   ct.title_nr
         ,   ct.titleTypeDe as cet_titleTypeDe                        
         ,   ct.titleTypeFr as cet_titleTypeFr            
         ,   ct.titleTypeIt as cet_titleTypeIt                       
@@ -407,7 +268,6 @@ create or replace view med_effective_merged_nodate_v as (
         ,   ct.issuanceDate as cet_issuanceDate           
         ,   ct.dateMebeko as cet_dateMebeko
 
-        ,   pl.pr_title_nr
         ,   pl.titleTypeDe as plCet_titleTypeDe
         ,   pl.titleTypeFr as plCet_titleTypeFr
         ,   pl.titleTypeIt as plCet_titleTypeIt
@@ -418,7 +278,6 @@ create or replace view med_effective_merged_nodate_v as (
         ,   pl.titleKindEn as plCet_titleKindEn
         ,   pl.issuanceDate as plCet_issuanceDate
 
-        ,   pa.addr_nr
         ,   pa.dateDecision as perm_addr_dateDecision
         ,   pa.practiceCompanyName as perm_addr_practiceCompanyName                                        
         ,   pa.streetWithNumber as perm_addr_streetWithNumber               
@@ -440,6 +299,6 @@ create or replace view med_effective_merged_nodate_v as (
         left join med_permissions pe            using (gln, effective_dt, expiry_dt, professionEn)
         left join med_cetTitles ct              using (gln, effective_dt, expiry_dt, professionEn)
         left join med_privateLawCetTitles pl    using (gln, effective_dt, expiry_dt, professionEn)
-        left join med_permissionAddress pa      using (gln, effective_dt, expiry_dt, professionEn, perm_nr)
+        left join med_permissionAddress pa      using (gln, effective_dt, expiry_dt, professionEn)
     where g.expiry_dt = '9999-12-31'
 );
