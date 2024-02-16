@@ -2,18 +2,6 @@
 
     $med_psy_db_names = array(
                 'name' => 'lastName'
-        /*,       'profession_textDe' => 'profession_textDe'
-        ,       'profession_textFr' => 'profession_textFr'
-        ,       'profession_textIt' => 'profession_textIt'
-        ,       'profession_textEn' => 'profession_textEn'
-        ,       '0_textDe' => 'cetTitles_textDe'
-        ,       '0_textFr' => 'cetTitles_textFr'
-        ,       '0_textIt' => 'cetTitles_textIt'
-        ,       '0_textEn' => 'cetTitles_textEn'
-        ,       'canton_textDe' => 'canton_textDe'
-        ,       'canton_textFr' => 'canton_textFr'
-        ,       'canton_textIt' => 'canton_textIt'
-        ,       'canton_textEn' => 'canton_textEn'*/
     );
 
 
@@ -27,19 +15,63 @@
     );
 
 
+    $med_cettitles_names = array(
+                'cetTitleTypeDe' => 'titleTypeDe'
+        ,       'cetTitleTypeFr' => 'titleTypeFr'
+        ,       'cetTitleTypeIt' => 'titleTypeIt'
+        ,       'cetTitleTypeEn' => 'titleTypeEn'
+        ,       'cetTitleKindDe' => 'titleKindDe'
+        ,       'cetTitleKindFr' => 'titleKindFr'
+        ,       'cetTitleKindIt' => 'titleKindIt'
+        ,       'cetTitleKindEn' => 'titleKindEn'
+    );
+
+    $med_privatelawcettitles_names = array(
+                'privateLawCetTitleTypeDe' => 'titleTypeDe'
+        ,       'privateLawCetTitleTypeFr' => 'titleTypeFr'
+        ,       'privateLawCetTitleTypeIt' => 'titleTypeIt'
+        ,       'privateLawCetTitleTypeEn' => 'titleTypeEn'
+        ,       'privateLawCetTitleKindDe' => 'titleKindDe'
+        ,       'privateLawCetTitleKindFr' => 'titleKindFr'
+        ,       'privateLawCetTitleKindIt' => 'titleKindIt'
+        ,       'privateLawCetTitleKindEn' => 'titleKindEn'
+    );
+
+    $med_permissionaddress_names = array(
+                'selfDispensationEn' => 'selfDispensation'
+        ,       'permissionBtmEn' => 'permissionBtm'
+    );
+
+
     // Function that changes the keys of the dictionary of the scraped data into the names of the columns in the tables, according to the mapping rules defined in the [med_psy/bet]_db_names dictionaries
     // Arguments: $dictionary_to_map: the dictionary that will change the keys, $register: used to define the correct mapping dictionary
-    function map_names($dictionary_to_map, $register) {
+    function map_names($dictionary_to_map, $register = '', $table_name = NULL) {
         global $med_psy_db_names;
         global $bet_db_names;
+        global $med_cettitles_names;
+        global $med_privatelawcettitles_names;
+        global $med_permissionaddress_names;
 
         $newDictionary = array();
 
-        if (in_array($register, ['medreg', 'psyreg'])) {
-            $name_mapper = $med_psy_db_names;
-        } else if ($register == 'betreg') {
-            $name_mapper = $bet_db_names;
-        }
+            if ($register != '') {
+                if (in_array($register, ['medreg', 'psyreg'])) {
+                    $name_mapper = $med_psy_db_names;
+                } else if ($register == 'betreg') {
+                    $name_mapper = $bet_db_names;
+                }
+
+            } else {
+                if ($table_name == 'med_permissionAddress') {
+                    $name_mapper = $med_permissionaddress_names;
+                } else if ($table_name == 'med_cettitles') {
+                    $name_mapper = $med_cettitles_names;
+                } else if ($table_name == 'med_privatelawcettitles') {
+                    $name_mapper = $med_privatelawcettitles_names;
+                }
+            }
+
+        
 
 
         foreach ($dictionary_to_map as $key => $value) {
