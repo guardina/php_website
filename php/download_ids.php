@@ -102,8 +102,8 @@
         $total = 0;
 
         if (in_array($bucket, $buckets_to_check)) {
-            echo "Rechecking bucket $bucket\n";
             for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
+                echo "Rechecking bucket $bucket\n";
                 $payloads = [];
                 for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
                     $payloads[] = ['id' => $j];
@@ -120,12 +120,12 @@
     
                 foreach ($results as $result) {
     
-                    $query = "INSERT INTO substr($register, 0, -3)_ids (round_2) VALUES (";
+                    $query = "UPDATE " . substr($register, 0, -3) . "_ids SET round_2 = ";
     
                     if ($result !== null) {
-                        $query .= "1)";
+                        $query .= "1";
                     } else {
-                        $query .= "0)";
+                        $query .= "0";
                     }
 
                     $query .= " WHERE id = $curr_id";
@@ -137,7 +137,7 @@
     
                 $bucket++;
     
-                echo "\n\nTime elapsed: " . $total_time . "\n\n";
+                echo "\nTime elapsed: " . $total_time . "\n\n";
             }
         }
 
@@ -205,12 +205,12 @@
             $bucket++;
         }
 
-        $to_check_again_query = "SELECT bucket FROM " . substr($register, 0, -3) . "_ids GROUP BY bucket HAVING COUNT(round_1) = 0";
+        $to_check_again_query = "SELECT bucket FROM " . substr($register, 0, -3) . "_ids GROUP BY bucket HAVING SUM(round_1) = 0";
         $result = mysqli_query($conn, $to_check_again_query);
 
         if ($result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
-                echo $row . "\n";
+                $bucket_to_check_again[] = $row['bucket'];
             }
         }
 
