@@ -40,7 +40,8 @@ CREATE TABLE bet_responsiblePersons (
     ,   effective_dt        DATE DEFAULT current_date 
     ,   expiry_dt           DATE DEFAULT '9999-12-31'
 
-    ,   PRIMARY KEY (bag_id, familyName, firstName, effective_dt, expiry_dt)
+    -- ,   PRIMARY KEY (bag_id, familyName, firstName, effective_dt, expiry_dt)
+    ,   PRIMARY KEY (bag_id, effective_dt, expiry_dt)
     ,   FOREIGN KEY (bag_id, effective_dt, expiry_dt)
             REFERENCES bet_companyGln (bag_id, effective_dt, expiry_dt)
             ON UPDATE CASCADE
