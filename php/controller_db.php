@@ -120,6 +120,26 @@
     }
 
 
+    function get_missing_ids($register) {
+        $conn = connect_to_db("stammdaten_gln");
+
+        $query = "SELECT id FROM " . substr($register, 0, -3) . "_ids WHERE round_1 = 0 AND (round_2 = 0 OR round_2 = NULL)";
+
+        $missing_ids = [];
+
+        $result = mysqli_query($conn, $query);
+        if (mysqli_num_rows($result) > 0) {
+            while ($row = mysqli_fetch_assoc($result)) {
+                $existing_ids[] = $row['id'];
+            }
+        }     
+
+        mysqli_close($conn);
+
+        return $missing_ids;
+    }
+
+
 
     // Returns true if the provided id is present in the databse, such that we can avoid a bucket of requests. Only works when downloading the whole database the first time, as afterwards it could
     // skip newly added ids. For instance, if it's checking the ids between 1 and 100, this function will only check if 1 is in the DB and assume also the other values up to 100 are in the DB 
