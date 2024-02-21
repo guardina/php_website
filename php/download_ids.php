@@ -105,7 +105,7 @@
 
         for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
             echo "[Bucket $bucket] Starting id check! ($register)\n";
-            if (bucket_already_exists_in_db($conn, $register, $i)) {
+            if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
                 echo "[Bucket $bucket] Already present in database ($register)\n\n";
                 $bucket++;
                 continue;

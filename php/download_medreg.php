@@ -64,7 +64,7 @@
 
         foreach($names as $name) {
             if (isset($list[$name]) && $list[$name] != "") {
-                if ($name == 'firstName' || $name == 'lastName') {
+                if ($name == 'firstName' || $name == 'lastName' || $name == 'familyName') {
                     $entries[$name] = format_name($list[$name]);
                 } else if (strpos(strtolower($name), 'date') !== false) {
                     $entries[$name] = format_date($list[$name]);
@@ -119,12 +119,13 @@
         $count = 0;
 
         for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
+            echo $i . " ---- " . $number_of_samples . "\n";
             echo "[Bucket $bucket] Starting data download! ($register)\n";
 
             //$curr_id = $existing_ids[$count];
 
 
-            if (bucket_already_exists_in_db($conn, $register, $i)) {
+            if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
                 echo "[Bucket $bucket] Already present in database ($register)\n\n";
                 $bucket++;
                 $count+=100;
@@ -134,7 +135,7 @@
 
             if (in_array($register, ['medreg', 'psyreg'])) {
                 $payloads = [];
-                for ($j = 0; $j < $requests_per_bucket; $j++) {
+                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
                     $payloads[] = ['id' => $j];
                 }   
 
@@ -145,7 +146,7 @@
             } else if ($register == 'betreg') {
                 $urls = [];
                 $payloads = [];
-                for ($j = 0; $j < $requests_per_bucket; $j++) {
+                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
                     $urls[] = $url . "/" . $j;
                 }   
 
@@ -209,11 +210,11 @@
                 }
 
 
-                for ($i = 0; $i < count($keys_to_use); $i++) {
-                    $entries = get_entries_by_names($flatten_result, $keys_to_use[$i]);
+                for ($k = 0; $k < count($keys_to_use); $k++) {
+                    $entries = get_entries_by_names($flatten_result, $keys_to_use[$k]);
                     $query = "";
                     if (!empty($entries)) {
-                        $table_name = $table_names_to_use[$i];
+                        $table_name = $table_names_to_use[$k];
 
                         if (in_array($table_name, ['med_permissionAddress', 'med_cettitles', 'med_privatelawcettitles'])) {
                             $entries = map_names($entries, table_name : $table_name);
