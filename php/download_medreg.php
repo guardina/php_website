@@ -105,7 +105,7 @@
 
         $conn = connect_to_db("stammdaten_gln");
 
-        $existing_ids = get_existing_ids($register);
+        //$existing_ids = get_existing_ids($register);
 
         global $requests_per_bucket;
 
@@ -121,10 +121,10 @@
         for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
             echo "[Bucket $bucket] Starting data download! ($register)\n";
 
-            $curr_id = $existing_ids[$count];
+            //$curr_id = $existing_ids[$count];
 
 
-            if (bucket_already_exists_in_db($conn, $register, $curr_id)) {
+            if (bucket_already_exists_in_db($conn, $register, $i)) {
                 echo "[Bucket $bucket] Already present in database ($register)\n\n";
                 $bucket++;
                 $count+=100;
@@ -134,7 +134,7 @@
 
             if (in_array($register, ['medreg', 'psyreg'])) {
                 $payloads = [];
-                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                for ($j = 0; $j < $requests_per_bucket; $j++) {
                     $payloads[] = ['id' => $j];
                 }   
 
@@ -145,7 +145,7 @@
             } else if ($register == 'betreg') {
                 $urls = [];
                 $payloads = [];
-                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                for ($j = 0; $j < $requests_per_bucket; $j++) {
                     $urls[] = $url . "/" . $j;
                 }   
 
@@ -161,6 +161,7 @@
                 // HERE WE CAN TAKE THE DATA, AS RESULT HAS FIRST NAME, LAST NAME, AND SO ON
 
                 if ($result == null) {
+                    $count++;
                     continue;
                 }
 
@@ -223,9 +224,9 @@
                         $formattedValue = format_values($values);
 
                         if ($table_name == 'med_gln' || $table_name == 'psy_gln') {
-                            $query = "INSERT INTO " . $table_name . "(id, " . implode(', ', $columns) . ") VALUES ($curr_id, $formattedValue)";
-                        } else if ($table_name == 'bet_companyGln') {
-                            $query = "INSERT INTO " . $table_name . "(bag_id, " . implode(', ', $columns) . ") VALUES ($curr_id, $formattedValue)";
+                            $query = "INSERT INTO " . $table_name . "(id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
+                        } else if ($table_name == 'bet_companyGln' || $table_name == 'bet_responsiblePersons') {
+                            $query = "INSERT INTO " . $table_name . "(bag_id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
                         } else {
                             $query = "INSERT INTO " . $table_name . "(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
                         }
@@ -234,10 +235,9 @@
                     $conn->query($query);
                     }
                 }
+                $count++;
 
-                echo "\n\n";
-
-                $curr_id = $existing_ids[++$count];
+                //$curr_id = $existing_ids[++$count];
             }
 
 
