@@ -120,6 +120,25 @@
     }
 
 
+
+    // Returns true if the provided id is present in the databse, such that we can avoid a bucket of requests. Only works when downloading the whole database the first time, as afterwards it could
+    // skip newly added ids. For instance, if it's checking the ids between 1 and 100, this function will only check if 1 is in the DB and assume also the other values up to 100 are in the DB 
+    // (if true is returned). If a new id 40 is added, it will not be checked. 
+    // The function is used in case there was some problem while downloading the first time and the process was halted; we avoid trying to redownload the whole database.
+    function bucket_already_exists_in_db($conn, $register, $id) {
+        if (in_array($register, ['medreg', 'psyreg'])) {
+            $select_query = "SELECT id from " . substr($register, 0, -3) . "_gln WHERE id=$id";
+        } else if ($register == 'betreg') {
+            $select_query = "SELECT bag_id from " . substr($register, 0, -3) . "_companyGln WHERE bag_id=$id";
+        }
+        
+        $result = mysqli_query($conn, $select_query);
+
+        return mysqli_num_rows($result) > 0;
+    }
+
+
+
     // TAKES 2 DICTIONARIES: FIRST IT MAPS THE SCRAPED NAMES TO DB NAMES, THEN ISERTS THEM INTO THE DB<
 
     /*
