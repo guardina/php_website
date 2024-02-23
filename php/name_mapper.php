@@ -75,13 +75,16 @@
 
 
         foreach ($dictionary_to_map as $key => $value) {
+            //echo "$key -> $value\n";
             if (isset($name_mapper[$key])) {
                 $newKey = $name_mapper[$key];
             } else {
                 $newKey = $key;
             }
             //$newDictionary[$newKey] = $value;
+            //echo "BEFORE:\n $newKey -> $value\n";
             $newDictionary[remove_extra($newKey)] = $value;
+            //echo "AFTER :\n " . remove_extra($newKey) . " -> $value\n";
         }   
 
         return $newDictionary;
@@ -95,7 +98,7 @@
         $newWord = preg_replace('/phoneNumbers_1/', 'phoneNumber2', $newWord);
         $newWord = preg_replace('/phoneNumbers_2/', 'phoneNumber3', $newWord);
 
-        $patterns = array('/_text/', '/Skills_[0-9]/', '/.*[0-9]_+/');
+        $patterns = array('/_text/', '/Skills_[0-9]/', '/.*0_+/');
         return preg_replace($patterns, '', $newWord);
     }
 

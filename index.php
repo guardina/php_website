@@ -38,21 +38,17 @@
     <br><br>
     <div style="display: flex; gap: 50px;">
         GLN: <input type="text" name="gln" value="<?php echo $gln;?>">
-        <input type="submit" class="button" name="get_from_DB" value="Search">
+        <input type="submit" class="button" name="get_from_DB" value="Search in Database">
     </div>
     <br><br>
-    <div style="display: flex; gap: 50px;">
-        <input type="submit" class="button" name="search_gln_medreg" value="Search GLN (Medreg)">
-        <select name="language" class="button" id="language">
-	        <option value="">--- Choose a language ---</option>
-	        <option value="De">Deutsch</option>
-	        <option value="Fr">Français</option>
-	        <option value="It">Italiano</option>
-            <option value="En">English</option>
-        </select>
-    </div>
+    <select name="language" class="button" id="language">
+	    <option value="">--- Choose a language ---</option>
+	    <option value="De">Deutsch</option>
+	    <option value="Fr">Français</option>
+	     <option value="It">Italiano</option>
+        <option value="En">English</option>
+    </select>
     <br><br>
-    <input type="submit" class="button" name="search_gln_refdata" value="Search GLN (Refdata)">
 
 </form> 
 
@@ -146,7 +142,7 @@
 
 
 <form method="post">
-    <input type="submit" class="button" name="get_all_glns" value="Download">
+    <input type="submit" class="button" name="get_all_glns" value="Download from medreg">
     <br><br>
 </html>
 
@@ -200,29 +196,7 @@
 
     if($_SERVER['REQUEST_METHOD'] == "POST")
     {
-        if (isset($_POST['search_gln_medreg'])) {
-            if ($gln != "") {
-                foreach(['medreg', 'psyreg', 'betreg'] as $register) {
-                    $data = get_medreg_data_by_gln("$gln", $register);
-
-                    print_info($gln, $data, $register);
-                }
-
-                
-            } else {
-                echo '<p class="error">Error! Invalid gln.</p>';
-            } 
-
-        } else if (isset($_POST['search_gln_refdata'])) {
-            if ($gln != "") {
-                echo '<br>Search gln [' . $gln . '] :<br><br>';
-
-                downloadAll();
-            } else {
-                echo '<p class="error">Error! Invalid gln.</p>';
-            }
-
-        } else if (isset($_POST['get_from_DB'])) {
+        if (isset($_POST['get_from_DB'])) {
             if ($firstName == "" && $lastName == "" && $gln == "") {
                 echo '<p class="error">Insert first name, last name or gln for a correct search!</p>';
             } else {
@@ -240,30 +214,23 @@
                     $data['gln'] = $gln;
                 }
 
-                get_entry($data);
-            }
-        } else if (isset($_POST['get_all_glns'])) {
-            $curr_gln = 7601000000019;
-            //$number_of_tries = 20;
-            $glns_to_find = 5;
+                foreach($data as $k => $v) {
+                    echo $k . " - " . $v . "\n";
+                }
 
-            while ($glns_to_find > 0 /*&& $number_of_tries > 0*/) {
-                $gln_found = false;
-                foreach(['medreg', 'psyreg', 'betreg'] as $register) {
-                    $data = get_medreg_data_by_gln("$curr_gln", $register);
+                $results = get_entry($data);
 
-                    if (!empty($data)) {
-                        print_info("$curr_gln", $data, $register);
-                        if (!$gln_found) {
-                            $gln_found = true;
-                            $glns_to_find--;
+                foreach ($results as $res) {
+                    foreach($res as $k => $v) {
+                        if (check_language($k)) {
+                            echo $k . ' -> ' . $v . '<br>';
                         }
                     }
                 }
-                $curr_gln++;
-                //$number_of_tries--;
-                echo "<br>";
-            } 
+            }
+
+        } else if (isset($_POST['get_all_glns'])) {
+            ;
         }
     }
 
@@ -286,7 +253,13 @@
     // Examples:
     // $language = Fr:
     // $key = genderFr => True / $key = genderDe => false / $key = firstName => true
-    function check_language($key, $language) {
+    function check_language($key) {
+        $language = filter_input(INPUT_POST, 'language', FILTER_SANITIZE_STRING);
+
+        if ($language == "") {
+            $language = "De";
+        }
+
         if (preg_match('/(?:De|Fr|It|En)$/', $key) && preg_match('/[a-z]+'.$language.'$/', $key)) {
             return true;    
         } else if (!preg_match('/(?:De|Fr|It|En)$/', $key)) {

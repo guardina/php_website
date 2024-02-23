@@ -68,11 +68,13 @@
         mysqli_stmt_close($newQuery);
         mysqli_close($conn);
 
-        foreach ($resultsArray as $res) {
+        return $resultsArray;
+
+        /*foreach ($resultsArray as $res) {
             foreach($res as $k => $v) {
                 echo $k . ' -> ' . $v . '<br>';
             }
-        }
+        }*/
                   
     }
 

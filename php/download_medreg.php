@@ -5,6 +5,7 @@
     include "medreg_HTTP_controller.php";
 
     $requests_per_bucket = 100;
+    $can_have_multiple = array('permissions', 'cetTitles', 'privateLawCetTitles', 'addresses');
 
 
     // Function that puts every first and last name in the correct format (first letter uppercase, the rest lowercase)
@@ -31,13 +32,24 @@
 
 
     // Function used to create a 1-dimensional array of the downloaded data and remove nested arrays.
-    function flatten_list($list, $prefix, $resulting_dictionary) {
+    function flatten_list($list, $prefix, $resulting_dictionary, $increase_by_one = false) {
+
+        global $can_have_multiple;
 
         $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAcknowledgeable', '_isAcknowledgement', 'isFederal', '_id');
+        
 
         foreach ($list as $key => $value) {
+            if ($increase_by_one) {
+                ++$key;
+            }
+
             if (is_array($value)) {
-                $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary);
+                if (in_array($key, $can_have_multiple)) {
+                    $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary, true);
+                } else {
+                    $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary, false);
+                }
             } else {
                 $ignore = false;
                 $string = $prefix . $key;
@@ -53,6 +65,14 @@
                 }
             }
         }
+
+
+        /*foreach ($resulting_dictionary as $k => $v) {
+            echo $k . " -- " . $v . "\n";
+        }
+
+        echo "\n\n";*/
+
         return $resulting_dictionary;
     }
 
@@ -63,17 +83,19 @@
         $entries = array();
 
         foreach($names as $name) {
-            if (isset($list[$name]) && $list[$name] != "") {
-                if ($name == 'firstName' || $name == 'lastName' || $name == 'familyName') {
-                    $entries[$name] = format_name($list[$name]);
-                } else if (strpos(strtolower($name), 'date') !== false) {
-                    $entries[$name] = format_date($list[$name]);
-                } else if ($name == 'selfDispensationEn' || $name == 'permissionBtmEn') {
-                    $list[$name] = ($list[$name] == 'Yes' ? 1 : 0);
-                } else if ($name == 'poBox') {
-                    $list[$name] = strval($list[$name]);
-                } else {
-                    $entries[$name] = $list[$name];
+            foreach ($list as $key => $value) {
+                if (strpos($key, $name) !== false && $list[$key] != "") {
+                    if ($name == 'firstName' || $name == 'lastName' || $name == 'familyName') {
+                        $entries[$key] = format_name($list[$key]);
+                    } else if (strpos(strtolower($name), 'date') !== false) {
+                        $entries[$key] = format_date($list[$key]);
+                    } else if ($name == 'selfDispensationEn' || $name == 'permissionBtmEn') {
+                        $entries[$key] = ($list[$key] == 'Yes' ? 1 : 0);
+                    } else if ($name == 'poBox') {
+                        $entries[$key] = strval($list[$key]);
+                    } else {
+                        $entries[$key] = $list[$key];
+                    }
                 }
             }
         }
@@ -100,8 +122,29 @@
     }
 
 
+    function check_if_id_needed($table_name, $count, $columns, $formattedValue) {
+        if ($table_name == 'med_gln' || $table_name == 'psy_gln') {
+            $query = "INSERT INTO " . $table_name . "(id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
+        } else if ($table_name == 'bet_companyGln' || $table_name == 'bet_responsiblePersons') {
+            $query = "INSERT INTO " . $table_name . "(bag_id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
+        } else {
+            $query = "INSERT INTO " . $table_name . "(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+        }
+
+        return $query;
+    }
+
+
+    function shorten_extra($string) {
+        $patterns = '/.*[0-9]_+/';
+        return preg_replace($patterns, '', $string);
+    }
+
+
 
     function download_all_medreg_data($register, $number_of_samples) {
+
+        global $can_have_multiple;
 
         $conn = connect_to_db("stammdaten_gln");
 
@@ -125,12 +168,12 @@
             //$curr_id = $existing_ids[$count];
 
 
-            if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
+            /*if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
                 echo "[Bucket $bucket] Already present in database ($register)\n\n";
                 $bucket++;
                 $count+=100;
                 continue;
-            }
+            }*/
 
 
             if (in_array($register, ['medreg', 'psyreg'])) {
@@ -176,6 +219,24 @@
                 echo "\n\n";*/
 
 
+                $multiple_max_values = [];
+
+                foreach ($can_have_multiple as $key) {
+                    $maxNumber = -1;
+                    foreach ($flatten_result as $res_key => $res_val) {
+                        if (preg_match("/". $key . "_(\d+)/", $res_key, $matches)) {
+                            $number = intval($matches[1]);
+                            $maxNumber = max($maxNumber, $number);
+                        }
+                    }
+                    $multiple_max_values[$key] = $maxNumber;
+                }
+
+                $need_addr_nr = ['med_permissionAddress', 'psy_permissionAddress'];
+                $need_perm_nr = ['med_permissions', 'med_permissionAddress', 'psy_permissions', 'psy_permissionAddress'];
+                $need_pr_title_nr = ['med_privateLawCetTitles'];
+                $need_title_nr = ['med_cetTitles', 'psy_cetTitles', 'psy_permissions', 'psy_permissionAddress'];
+
                 $keys_to_use = [];
                 $table_names_to_use = [];
 
@@ -216,27 +277,147 @@
                     if (!empty($entries)) {
                         $table_name = $table_names_to_use[$k];
 
+                        $requires_addr = in_array($table_name, $need_addr_nr);
+                        $requires_perm = in_array($table_name, $need_perm_nr);
+                        $requries_pr_title = in_array($table_name, $need_pr_title_nr);
+                        $requires_titles = in_array($table_name, $need_title_nr);
+
                         if (in_array($table_name, ['med_permissionAddress', 'med_cettitles', 'med_privatelawcettitles'])) {
                             $entries = map_names($entries, table_name : $table_name);
                         }
-                        $columns = array_keys($entries);
-                        $values = array_values($entries);
 
-                        $formattedValue = format_values($values);
+                        if ($table_name == 'med_permissions') {
+                            for ($perm_nr = 1; $perm_nr <= $multiple_max_values['permissions']; $perm_nr++) {
+                                $entries['perm_nr'] = $perm_nr;
 
-                        if ($table_name == 'med_gln' || $table_name == 'psy_gln') {
-                            $query = "INSERT INTO " . $table_name . "(id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
-                        } else if ($table_name == 'bet_companyGln' || $table_name == 'bet_responsiblePersons') {
-                            $query = "INSERT INTO " . $table_name . "(bag_id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
+                                $newEntries = [];
+                                foreach ($entries as $key => $value) {
+                                    if (strpos($key, 'permissions') !== false && !preg_match("/permissions_$perm_nr/", $key)) {
+                                        continue;
+                                    }
+                                    $newEntries[shorten_extra($key)] = $value;
+                                }
+
+                                $columns = array_keys($newEntries);
+                                $values = array_values($newEntries);
+
+                                $formattedValue = format_values($values);
+
+                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
+                                //echo $query . "\n";
+                                $conn->query($query);
+                            }
+
+                            //echo "\n";
+
+                        } else if ($table_name == 'med_permissionAddress') {
+                            for ($perm_nr = 1; $perm_nr <= $multiple_max_values['permissions']; $perm_nr++) {
+                                $entries['perm_nr'] = $perm_nr;
+
+                                $newEntries = [];
+                                foreach ($entries as $key => $value) {
+                                    if (strpos($key, 'permissions') !== false && !preg_match("/permissions_$perm_nr/", $key)) {
+                                        continue;
+                                    }
+                                    $newEntries[$key] = $value;
+                                }
+
+
+                                for ($addr_nr = 1; $addr_nr <= $multiple_max_values['addresses']; $addr_nr++) {
+                                    $newEntries['addr_nr'] = $addr_nr;
+
+                                    $newEntries2 = [];
+                                    foreach ($newEntries as $key2 => $val2) {
+                                        if (strpos($key2, 'addresses') !== false && !preg_match("/addresses_$addr_nr/", $key2)) {
+                                            continue;
+                                        }
+                                        $newEntries2[shorten_extra($key2)] = $val2;
+                                    }
+                                }
+
+                                $columns = array_keys($newEntries2);
+                                $values = array_values($newEntries2);
+                                $formattedValue = format_values($values);
+
+                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
+                                //echo $query . "\n";
+                                $conn->query($query);
+                            }
+                            
+                            //echo "\n";
+
+                        } else if ($table_name == 'med_cetTitles') {
+                            for ($title_nr = 1; $title_nr <= $multiple_max_values['cetTitles']; $title_nr++) {
+                                $entries['title_nr'] = $title_nr;
+
+                                $newEntries = [];
+                                foreach ($entries as $key => $value) {
+                                    if (strpos($key, 'cetTitles') !== false && !preg_match("/cetTitles_$title_nr/", $key)) {
+                                        continue;
+                                    }
+                                    $newEntries[shorten_extra($key)] = $value;
+                                }
+                                
+                                $columns = array_keys($newEntries);
+                                $values = array_values($newEntries);
+
+                                $formattedValue = format_values($values);
+
+                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
+                                //echo $query . "\n";
+                                $conn->query($query);
+                            }
+
+                            //echo "\n";
+
+                        } else if ($table_name == 'med_privateLawCetTitles') {
+                            for ($pr_title_nr = 1; $pr_title_nr <= $multiple_max_values['privateLawCetTitles']; $pr_title_nr++) {
+                                $entries['pr_title_nr'] = $pr_title_nr;
+
+                                $newEntries = [];
+                                foreach ($entries as $key => $value) {
+                                    if (strpos($k, 'privateLawCetTitles') !== false && !preg_match("/privateLawCetTitles_$pr_title_nr/", $key)) {
+                                        continue;
+                                    }
+                                    $newEntries[shorten_extra($key)] = $value;
+                                }
+
+                                $columns = array_keys($newEntries);
+                                $values = array_values($newEntries);
+
+                                $formattedValue = format_values($values);
+
+                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
+                                //echo $query . "\n";
+                                $conn->query($query);
+                            }
+
+                            //echo "\n";
+
+                        } else if ($table_name == 'psy_permissions') {
+                            
+
+                        } else if ($table_name == 'psy_permissionAddress') {
+                            
+
+                        } else if ($table_name == 'psy_cetTitles') {
+                            
                         } else {
-                            $query = "INSERT INTO " . $table_name . "(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
+                            $columns = array_keys($entries);
+                            $values = array_values($entries);
+
+                            $formattedValue = format_values($values);
+
+                            $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
+                            //echo $query . "\n";
+                            $conn->query($query);
                         }
 
-                        //echo $query . "\n";
-                    $conn->query($query);
                     }
                 }
                 $count++;
+
+                echo "\n\n";
 
                 //$curr_id = $existing_ids[++$count];
             }
