@@ -70,5 +70,5 @@
         curl_multi_close($multiHandle);
 
         return $results;
-    }
+    } 
 ?>
