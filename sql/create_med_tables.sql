@@ -41,7 +41,7 @@ CREATE TABLE med_nationalities (
 CREATE TABLE med_languages (
         gln         		BIGINT UNSIGNED 
     ,   languageDe  		VARCHAR(40)
-    ,   languageFr  		VARCHAR(40)
+    ,   languageFr  		VARCHAR(40)     
     ,   languageIt  		VARCHAR(40)
     ,   languageEn  		VARCHAR(40)
     ,   effective_dt        DATE DEFAULT current_date 

@@ -7,6 +7,7 @@ USE stammdaten_gln;
 
 CREATE TABLE psy_gln (
         gln                 BIGINT UNSIGNED
+    ,   id                  INT
     ,   lastName            VARCHAR(70)
     ,   firstName           VARCHAR(70)
     ,   genderDe            VARCHAR(20)
