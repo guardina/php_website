@@ -31,78 +31,6 @@
     }
 
 
-    // Function used to create a 1-dimensional array of the downloaded data and remove nested arrays.
-    function flatten_list($list, $prefix, $resulting_dictionary, $increase_by_one = false) {
-
-        global $can_have_multiple;
-
-        $list_rejected = array('maxResultCount', 'tooManyResults', 'parentId', 'isActive', 'isNada', 'isBgmd', 'isEquivalent', 'isAcknowledgeable', '_isAcknowledgement', 'isFederal', '_id');
-        
-
-        foreach ($list as $key => $value) {
-            if ($increase_by_one) {
-                ++$key;
-            }
-
-            if (is_array($value)) {
-                if (in_array($key, $can_have_multiple)) {
-                    $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary, true);
-                } else {
-                    $resulting_dictionary = flatten_list($value, $prefix . $key . '_', $resulting_dictionary, false);
-                }
-            } else {
-                $ignore = false;
-                $string = $prefix . $key;
-                foreach($list_rejected as $substring) {
-                    if (strpos($string, $substring) !== false) {
-                        $ignore = true;
-                        break;
-                    }
-                }
-
-                if (!$ignore) {
-                    $resulting_dictionary[$string] = $value;
-                }
-            }
-        }
-
-
-        /*foreach ($resulting_dictionary as $k => $v) {
-            echo $k . " -- " . $v . "\n";
-        }
-
-        echo "\n\n";*/
-
-        return $resulting_dictionary;
-    }
-
-
-
-    // $list can contain all possible keys and values obtainable from the MedReg website, this function returns only the selected keys (specified in $names)
-    function get_entries_by_names($list, $names) {
-        $entries = array();
-
-        foreach($names as $name) {
-            foreach ($list as $key => $value) {
-                if (strpos($key, $name) !== false && $list[$key] != "") {
-                    if ($name == 'firstName' || $name == 'lastName' || $name == 'familyName') {
-                        $entries[$key] = format_name($list[$key]);
-                    } else if (strpos(strtolower($name), 'date') !== false) {
-                        $entries[$key] = format_date($list[$key]);
-                    } else if ($name == 'selfDispensationEn' || $name == 'permissionBtmEn') {
-                        $entries[$key] = ($list[$key] == 'Yes' ? 1 : 0);
-                    } else if ($name == 'poBox') {
-                        $entries[$key] = strval($list[$key]);
-                    } else {
-                        $entries[$key] = $list[$key];
-                    }
-                }
-            }
-        }
-
-        return $entries;
-    }
-
 
     // Properly format strings and integers to be inserted inside a SQL table
     function format_values($values) {
@@ -119,19 +47,6 @@
         $formattedValue = rtrim($formattedValue, ", ") . "";
 
         return $formattedValue;
-    }
-
-
-    function check_if_id_needed($table_name, $count, $columns, $formattedValue) {
-        if ($table_name == 'med_gln' || $table_name == 'psy_gln') {
-            $query = "INSERT INTO " . $table_name . "(id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
-        } else if ($table_name == 'bet_companyGln' || $table_name == 'bet_responsiblePersons') {
-            $query = "INSERT INTO " . $table_name . "(bag_id, " . implode(', ', $columns) . ") VALUES ($count, $formattedValue)";
-        } else {
-            $query = "INSERT INTO " . $table_name . "(" . implode(', ', $columns) . ") VALUES ($formattedValue)";
-        }
-
-        return $query;
     }
 
 
@@ -168,12 +83,12 @@
             //$curr_id = $existing_ids[$count];
 
 
-            /*if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
+            if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
                 echo "[Bucket $bucket] Already present in database ($register)\n\n";
                 $bucket++;
                 $count+=100;
                 continue;
-            }*/
+            }
 
 
             if (in_array($register, ['medreg', 'psyreg'])) {
@@ -200,226 +115,372 @@
 
             $total_time = $end_time - $start_time;
 
-            foreach ($results as $result) {
+
+
+            if ($register == 'medreg') {
+                $tab_infix = 'med';
+                $data_map_d = [
+                    'gln' => [],
+                    'nationalities' => [],
+                    'languages' => [],
+                    'professions' => [],
+                    'cetTitles' => [],
+                    'privateLawCetTitles' => [],
+                    'permissions' => [],
+                    'permissionAddress' => [],
+                ];
+            } elseif ($register == 'psyreg') {
+                $tab_infix = 'psy';
+                $data_map_d = [
+                    'gln' => [],
+                    'nationalities' => [],
+                    'languages' => [],
+                    'diplomas' => [],
+                    'cetTitles' => [],
+                    'permissions' => [],
+                    'permissionAddresses' => [],
+                ];
+            } elseif ($register == 'betreg') {
+                $tab_infix = 'bet';
+                $data_map_d = [
+                    'companyGln' => [],
+                    'responsiblePersons' => [],
+                ];
+            }
+
+
+            foreach ($results as $person) {
+
 
                 // HERE WE CAN TAKE THE DATA, AS RESULT HAS FIRST NAME, LAST NAME, AND SO ON
 
-                if ($result == null) {
-                    $count++;
+                if ($person == null) {
                     continue;
                 }
 
-                $flatten_result = flatten_list($result, '', array());
-                $flatten_result = map_names($flatten_result, $register);
 
-                /*foreach ($flatten_result as $k => $v) {
-                    echo $k . ": " . $v . "\n";
-                }
-
-                echo "\n\n";*/
-
-
-                $multiple_max_values = [];
-
-                foreach ($can_have_multiple as $key) {
-                    $maxNumber = -1;
-                    foreach ($flatten_result as $res_key => $res_val) {
-                        if (preg_match("/". $key . "_(\d+)/", $res_key, $matches)) {
-                            $number = intval($matches[1]);
-                            $maxNumber = max($maxNumber, $number);
+                try {
+                    if (in_array($register, ['medreg', 'psyreg'])) {
+                        if (isset($person['gln'])) {
+                            $data_map_d['gln'][] = [
+                                'gln' => (int)$person['gln'],
+                                'id' => $person['id'],
+                                'lastName' => format_name($person['name']),
+                                'firstName' => format_name($person['firstName']),
+                                'genderDe' => $person['gender']['textDe'],
+                                'genderFr' => $person['gender']['textFr'],
+                                'genderIt' => $person['gender']['textIt'],
+                                'genderEn' => $person['gender']['textEn'],
+                                'yearOfBirth' => $person['yearOfBirth'],
+                                'uid' => $person['uid'],
+                                'hasPermission' => $person['hasPermission'],
+                                'hasProvider90Days' => $person['hasProvider90Days']
+                            ];
+                
+                            foreach ($person['nationalities'] as $nat) {
+                                $data_map_d['nationalities'][] = [
+                                    'gln' => (int)$person['gln'],
+                                    'nationalityDe' => $nat['textDe'],
+                                    'nationalityFr' => $nat['textFr'],
+                                    'nationalityIt' => $nat['textIt'],
+                                    'nationalityEn' => $nat['textEn']
+                                ];
+                            }
+                
+                            foreach ($person['languageSkills'] as $lang) {
+                                $data_map_d['languages'][] = [
+                                    'gln' => (int)$person['gln'],
+                                    'languageDe' => $lang['textDe'],
+                                    'languageFr' => $lang['textFr'],
+                                    'languageIt' => $lang['textIt'],
+                                    'languageEn' => $lang['textEn']
+                                ];
+                            }
                         }
                     }
-                    $multiple_max_values[$key] = $maxNumber;
-                }
-
-                $need_addr_nr = ['med_permissionAddress', 'psy_permissionAddress'];
-                $need_perm_nr = ['med_permissions', 'med_permissionAddress', 'psy_permissions', 'psy_permissionAddress'];
-                $need_pr_title_nr = ['med_privateLawCetTitles'];
-                $need_title_nr = ['med_cetTitles', 'psy_cetTitles', 'psy_permissions', 'psy_permissionAddress'];
-
-                $keys_to_use = [];
-                $table_names_to_use = [];
-
-                if ($register == 'medreg') {
-                    $keys_to_use[] = array("gln", "lastName", "firstName", "genderDe", "genderFr", "genderIt", "genderEn", "yearOfBirth", "uid", "hasPermission", "hasProvider90Days");
-                    $keys_to_use[] = array("gln", "languageDe", "languageFr", "languageIt", "languageEn");
-                    $keys_to_use[] = array("gln", "nationalityDe", "nationalityFr", "nationalityIt", "nationalityEn");
-                    $keys_to_use[] = array("gln", "professionDe", "professionFr", "professionIt", "professionEn", "diyplomaTypeDe", "diyplomaTypeFr", "diyplomaTypeIt", "diyplomaTypeEn", "issuanceDate", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "dateMebeko", "providers90Days", " hasPermissionOtherThanNoLicence");
-                    $keys_to_use[] = array("gln", "professionEn", "permissionTypeDe", "permissionTypeFr", "permissionTypeIt", "permissionTypeEn", "permissionStateDe", "permissionStateFr", "permissionStateIt", "permissionStateEn", "permissionActivityStateDe", "permissionActivityStateFr", "permissionActivityStateIt", "permissionActivityStateEn", "cantonDe", "cantonFr", "cantonIt", "cantonEn", "dateDecision", "dateActivity", "restrictions");
-                    $keys_to_use[] = array("gln", "professionEn", "dateDecision", "practiceCompanyName", "streetWithNumber", "zipCity", "zip", "city", "phoneNumber1", "phoneNumber2", "phoneNumber3", "faxnumber", "uid", "selfDispensationEn", "permissionBtmEn");
-                    $keys_to_use[] = array("gln", "professionEn", "cetTitleTypeDe", "cetTitleTypeFr", "cetTitleTypeIt", "cetTitleTypeEn", "cetTitleKindDe", "cetTitleKindFr", "cetTitleKindit", "cetTitleKindEn", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "issuanceDate", "dateMebeko");
-                    $keys_to_use[] = array("gln", "professionEn", "privateLawCetTitleTypeDe", "privateLawCetTitleTypeFr", "privateLawCetTitleTypeIt", "privateLawCetTitleTypeEn", "privateLawCetTitleKindDe", "privateLawCetTitleKindFr", "privateLawCetTitleKindIt", "privateLawCetTitleKindEn", "issuanceDate");
-
-                    $table_names_to_use = ["med_gln", "med_languages", "med_nationalities", "med_professions", "med_permissions", "med_permissionAddress", "med_cetTitles", "med_privateLawCetTitles"];
-
-                } else if ($register == 'psyreg') {
-                    $keys_to_use[] = array("gln", "lastName", "firstName", "genderDe", "genderFr", "genderIt", "genderEn", "yearOfBirth", "uid", "hasPermission", "hasProvider90Days");
-                    $keys_to_use[] = array("gln", "languageDe", "languageFr", "languageIt", "languageEn");
-                    $keys_to_use[] = array("gln", "nationalityDe", "nationalityFr", "nationalityIt", "nationalityEn");
-                    $keys_to_use[] = array("gln", "professionDe", "professionFr", "professionIt", "professionEn", "diyplomaTypeDe", "diyplomaTypeFr", "diyplomaTypeIt", "diyplomaTypeEn", "issuanceDate", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "datePsyko");
-                    $keys_to_use[] = array("gln", "professionDe", "professionFr", "professionIt", "professionEn", "titleTypeDe", "titleTypeFr", "titleTypeIt", "titleTypeEn", "titleKindDe", "titleKindFr", "titleKindit", "titleKindEn", "issuanceCountryDe", "issuanceCountryFr", "issuanceCountryIt", "issuanceCountryEn", "issuanceDate", "datePsyko", "cetCourseDe", "cetCourseFr", "cetCourseIt", "cetCourseEn", "cetCourseName", "organisationName", "organisationZip", "organisationCity", "additionalIssuanceCountry", "additionalIssuanceDate", "additionalCetCourse", "additionalOrganisation", "providers90Days", "hasPermissionOtherThanNoLicence");
-                    $keys_to_use[] = array("gln", "legalBasisDe", "legalBasisFr", "legalBasisIt", "legalBasisEn", "permissionStateDe", "permissionStateFr", "permissionStateIt", "permissionStateEn", "cantonDe", "cantonFr", "cantonIt", "cantonEn", "timeLimitationDate", "dateDecision", "restrictions");
-                    $keys_to_use[] = array("gln", "practiceCompanyName", "streetWithNumber", "addition1", "addition2", "zipCity", "zip", "city", "phoneNumber", "email");
-
-                    $table_names_to_use = ["psy_gln", "psy_languages", "psy_nationalities", "psy_diplomas", "psy_cetTitles", "psy_permissions", "psy_permissionAddress"];
-
-                } else if ($register == 'betreg'){
-                    $keys_to_use[] = array("glnCompany", "companyName", "additionalName", "streetWithNumber", "poBox", "zip", "zipCity", "city", "cantonDe", "cantonFr", "cantonIt", "cantonEn", "companyTypeDe", "companyTypeFr", "companyTypeIt", "companyTypeEn", "permissionBtmDe", "permissionBtmFr", "permissionBtmIt", "permissionBtmEn");
-                    $keys_to_use[] = array("glnPerson", "familyName", "firstName");
-
-                    $table_names_to_use = ["bet_companyGln", "bet_responsiblePersons"];
-                }
-
-
-                for ($k = 0; $k < count($keys_to_use); $k++) {
-                    $entries = get_entries_by_names($flatten_result, $keys_to_use[$k]);
-                    $query = "";
-                    if (!empty($entries)) {
-                        $table_name = $table_names_to_use[$k];
-
-                        $requires_addr = in_array($table_name, $need_addr_nr);
-                        $requires_perm = in_array($table_name, $need_perm_nr);
-                        $requries_pr_title = in_array($table_name, $need_pr_title_nr);
-                        $requires_titles = in_array($table_name, $need_title_nr);
-
-                        if (in_array($table_name, ['med_permissionAddress', 'med_cettitles', 'med_privatelawcettitles'])) {
-                            $entries = map_names($entries, table_name : $table_name);
+            
+                    if ($register == 'medreg') {
+                        if (isset($person['gln']) && !empty($person['gln'])) {
+                            foreach ($person['professions'] as $prof) {
+                                $data_map_d['professions'][] = [
+                                    'gln' => (int)$person['gln'],
+                                    'professionDe' => $prof['profession']['textDe'],
+                                    'professionFr' => $prof['profession']['textFr'],
+                                    'professionIt' => $prof['profession']['textIt'],
+                                    'professionEn' => $prof['profession']['textEn'],
+                                    'diplomaTypeDe' => $prof['diplomaType']['textDe'],
+                                    'diplomaTypeFr' => $prof['diplomaType']['textFr'],
+                                    'diplomaTypeIt' => $prof['diplomaType']['textIt'],
+                                    'diplomaTypeEn' => $prof['diplomaType']['textEn'],
+                                    'issuanceDate' => isset($prof['issuanceDate']) ? format_date($prof['issuanceDate']) : null,
+                                    'issuanceCountryDe' => $prof['issuanceCountry']['textDe'],
+                                    'issuanceCountryFr' => $prof['issuanceCountry']['textFr'],
+                                    'issuanceCountryIt' => $prof['issuanceCountry']['textIt'],
+                                    'issuanceCountryEn' => $prof['issuanceCountry']['textEn'],
+                                    'dateMebeko' => isset($prof['dateMebeko']) ? format_date($prof['dateMebeko']) : null,
+                                    'providers90Days' => json_encode($prof['providers90Days']),
+                                    'hasPermissionOtherThanNoLicence' => $prof['hasPermissionOtherThantNoLicence']
+                                ];
+                            }
+        
+                            foreach ($prof['cetTitles'] as $title_nr => $title) {
+                                $data_map_d['cetTitles'][] = [
+                                    'gln' => (int)$person['gln'],
+                                    'title_nr' => $title_nr + 1,
+                                    'professionEn' => $prof['profession']['textEn'],
+                                    'titleTypeDe' => $title['cetTitleType']['textDe'],
+                                    'titleTypeFr' => $title['cetTitleType']['textFr'],
+                                    'titleTypeIt' => $title['cetTitleType']['textIt'],
+                                    'titleTypeEn' => $title['cetTitleType']['textEn'],
+                                    'titleKindDe' => $title['cetTitleKind']['textDe'],
+                                    'titleKindFr' => $title['cetTitleKind']['textFr'],
+                                    'titleKindIt' => $title['cetTitleKind']['textIt'],
+                                    'titleKindEn' => $title['cetTitleKind']['textEn'],
+                                    'issuanceCountryDe' => $title['issuanceCountry']['textDe'],
+                                    'issuanceCountryFr' => $title['issuanceCountry']['textFr'],
+                                    'issuanceCountryIt' => $title['issuanceCountry']['textIt'],
+                                    'issuanceCountryEn' => $title['issuanceCountry']['textEn'],
+                                    'issuanceDate' => isset($title['issuanceDate']) ? format_date($title['issuanceDate']) : null,
+                                    'dateMebeko' => isset($title['dateMebeko']) ? format_date($title['dateMebeko']) : null
+                                ];
+                            }
+                            
+                            foreach ($prof['privateLawCetTitles'] as $pr_title_nr => $title) {
+                                $data_map_d['privateLawCetTitles'][] = [
+                                    'gln' => (int)$person['gln'],
+                                    'pr_title_nr' => $pr_title_nr + 1,
+                                    'professionEn' => $prof['profession']['textEn'],
+                                    'titleTypeDe' => $title['privateLawCetTitleType']['textDe'],
+                                    'titleTypeFr' => $title['privateLawCetTitleType']['textFr'],
+                                    'titleTypeIt' => $title['privateLawCetTitleType']['textIt'],
+                                    'titleTypeEn' => $title['privateLawCetTitleType']['textEn'],
+                                    'titleKindDe' => $title['privateLawCetTitleKind']['textDe'],
+                                    'titleKindFr' => $title['privateLawCetTitleKind']['textFr'],
+                                    'titleKindIt' => $title['privateLawCetTitleKind']['textIt'],
+                                    'titleKindEn' => $title['privateLawCetTitleKind']['textEn'],
+                                    'issuanceDate' => isset($title['issuanceDate']) ? format_date($title['issuanceDate']) : null
+                                ];
+                            }
+                            
+                            foreach ($prof['permissions'] as $perm_nr => $perm) {
+                                $data_map_d['permissions'][] = [
+                                    'gln' => (int)$person['gln'],
+                                    'perm_nr' => $perm_nr + 1,
+                                    'professionEn' => $prof['profession']['textEn'],
+                                    'permissionTypeDe' => $perm['permissionType']['textDe'],
+                                    'permissionTypeFr' => $perm['permissionType']['textFr'],
+                                    'permissionTypeIt' => $perm['permissionType']['textIt'],
+                                    'permissionTypeEn' => $perm['permissionType']['textEn'],
+                                    'permissionStateDe' => isset($perm['permissionState']) ? $perm['permissionState']['textDe'] : null,
+                                    'permissionStateFr' => isset($perm['permissionState']) ? $perm['permissionState']['textFr'] : null,
+                                    'permissionStateIt' => isset($perm['permissionState']) ? $perm['permissionState']['textIt'] : null,
+                                    'permissionStateEn' => isset($perm['permissionState']) ? $perm['permissionState']['textEn'] : null,
+                                    'permissionActivityStateDe' => isset($perm['permissionActivityState']) ? $perm['permissionActivityState']['textDe'] : null,
+                                    'permissionActivityStateFr' => isset($perm['permissionActivityState']) ? $perm['permissionActivityState']['textFr'] : null,
+                                    'permissionActivityStateIt' => isset($perm['permissionActivityState']) ? $perm['permissionActivityState']['textIt'] : null,
+                                    'permissionActivityStateEn' => isset($perm['permissionActivityState']) ? $perm['permissionActivityState']['textEn'] : null,
+                                    'cantonDe' => $perm['canton']['textDe'],
+                                    'cantonFr' => $perm['canton']['textFr'],
+                                    'cantonIt' => $perm['canton']['textIt'],
+                                    'cantonEn' => $perm['canton']['textEn'],
+                                    'dateDecision' => isset($perm['dateDecision']) ? format_date($perm['dateDecision']) : null,
+                                    'dateActivity' => isset($perm['dateActivity']) ? format_date($perm['dateActivity']) : null,
+                                    'restrictions' => json_encode($perm['restrictions'])
+                                ];
+                            
+                                foreach ($perm['addresses'] as $addr_nr => $addr) {
+                                    $phone_nrs = array_column($addr['phoneNumbers'], 'phoneNumber');
+                            
+                                    $data_map_d['permissionAddress'][] = [
+                                        'gln' => (int)$person['gln'],
+                                        'perm_nr' => $perm_nr + 1,
+                                        'addr_nr' => $addr_nr + 1,
+                                        'professionEn' => $prof['profession']['textEn'],
+                                        'practiceCompanyName' => $addr['practiceCompanyName'],
+                                        'streetWithNumber' => $addr['streetWithNumber'],
+                                        'zipCity' => $addr['zipCity'],
+                                        'zip' => $addr['zip'],
+                                        'city' => $addr['city'],
+                                        'phoneNumber1' => isset($phone_nrs[0]) ? $phone_nrs[0] : null,
+                                        'phoneNumber2' => isset($phone_nrs[1]) ? $phone_nrs[1] : null,
+                                        'phoneNumber3' => isset($phone_nrs[2]) ? $phone_nrs[2] : null,
+                                        'faxNumber' => $addr['faxNumber'],
+                                        'uid' => $addr['uid'],
+                                        'selfDispensation' => isset($addr['selfDispensation']) ? ($addr['selfDispensation']['textDe'] == 'Ja') : null,
+                                        'permissionBtm' => isset($addr['permissionBtm']) ? ($addr['permissionBtm']['textDe'] == 'Ja') : null
+                                    ];
+                                }
+                            }
                         }
-
-                        if ($table_name == 'med_permissions') {
-                            for ($perm_nr = 1; $perm_nr <= $multiple_max_values['permissions']; $perm_nr++) {
-                                $entries['perm_nr'] = $perm_nr;
-
-                                $newEntries = [];
-                                foreach ($entries as $key => $value) {
-                                    if (strpos($key, 'permissions') !== false && !preg_match("/permissions_$perm_nr/", $key)) {
-                                        continue;
-                                    }
-                                    $newEntries[shorten_extra($key)] = $value;
-                                }
-
-                                $columns = array_keys($newEntries);
-                                $values = array_values($newEntries);
-
-                                $formattedValue = format_values($values);
-
-                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
-                                //echo $query . "\n";
-                                $conn->query($query);
-                            }
-
-                            //echo "\n";
-
-                        } else if ($table_name == 'med_permissionAddress') {
-                            for ($perm_nr = 1; $perm_nr <= $multiple_max_values['permissions']; $perm_nr++) {
-                                $entries['perm_nr'] = $perm_nr;
-
-                                $newEntries = [];
-                                foreach ($entries as $key => $value) {
-                                    if (strpos($key, 'permissions') !== false && !preg_match("/permissions_$perm_nr/", $key)) {
-                                        continue;
-                                    }
-                                    $newEntries[$key] = $value;
-                                }
-
-
-                                for ($addr_nr = 1; $addr_nr <= $multiple_max_values['addresses']; $addr_nr++) {
-                                    $newEntries['addr_nr'] = $addr_nr;
-
-                                    $newEntries2 = [];
-                                    foreach ($newEntries as $key2 => $val2) {
-                                        if (strpos($key2, 'addresses') !== false && !preg_match("/addresses_$addr_nr/", $key2)) {
-                                            continue;
-                                        }
-                                        $newEntries2[shorten_extra($key2)] = $val2;
-                                    }
-                                }
-
-                                $columns = array_keys($newEntries2);
-                                $values = array_values($newEntries2);
-                                $formattedValue = format_values($values);
-
-                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
-                                //echo $query . "\n";
-                                $conn->query($query);
-                            }
-                            
-                            //echo "\n";
-
-                        } else if ($table_name == 'med_cetTitles') {
-                            for ($title_nr = 1; $title_nr <= $multiple_max_values['cetTitles']; $title_nr++) {
-                                $entries['title_nr'] = $title_nr;
-
-                                $newEntries = [];
-                                foreach ($entries as $key => $value) {
-                                    if (strpos($key, 'cetTitles') !== false && !preg_match("/cetTitles_$title_nr/", $key)) {
-                                        continue;
-                                    }
-                                    $newEntries[shorten_extra($key)] = $value;
-                                }
-                                
-                                $columns = array_keys($newEntries);
-                                $values = array_values($newEntries);
-
-                                $formattedValue = format_values($values);
-
-                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
-                                //echo $query . "\n";
-                                $conn->query($query);
-                            }
-
-                            //echo "\n";
-
-                        } else if ($table_name == 'med_privateLawCetTitles') {
-                            for ($pr_title_nr = 1; $pr_title_nr <= $multiple_max_values['privateLawCetTitles']; $pr_title_nr++) {
-                                $entries['pr_title_nr'] = $pr_title_nr;
-
-                                $newEntries = [];
-                                foreach ($entries as $key => $value) {
-                                    if (strpos($k, 'privateLawCetTitles') !== false && !preg_match("/privateLawCetTitles_$pr_title_nr/", $key)) {
-                                        continue;
-                                    }
-                                    $newEntries[shorten_extra($key)] = $value;
-                                }
-
-                                $columns = array_keys($newEntries);
-                                $values = array_values($newEntries);
-
-                                $formattedValue = format_values($values);
-
-                                $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
-                                //echo $query . "\n";
-                                $conn->query($query);
-                            }
-
-                            //echo "\n";
-
-                        } else if ($table_name == 'psy_permissions') {
-                            
-
-                        } else if ($table_name == 'psy_permissionAddress') {
-                            
-
-                        } else if ($table_name == 'psy_cetTitles') {
-                            
-                        } else {
-                            $columns = array_keys($entries);
-                            $values = array_values($entries);
-
-                            $formattedValue = format_values($values);
-
-                            $query = check_if_id_needed($table_name, $count, $columns, $formattedValue);
-                            //echo $query . "\n";
-                            $conn->query($query);
-                        }
-
                     }
+            
+                    if ($register == 'psyreg') {
+                        if (isset($person['gln']) && !empty($person['gln'])) {
+                            foreach ($person['diplomas'] as $diploma) {
+                                $data_map_d['diplomas'][] = [
+                                    'gln' => (int) $person['gln'],
+                                    'professionDe' => $diploma['profession']['textDe'],
+                                    'professionFr' => $diploma['profession']['textFr'],
+                                    'professionIt' => $diploma['profession']['textIt'],
+                                    'professionEn' => $diploma['profession']['textEn'],
+                                    'diplomaTypeDe' => isset($diploma['diplomaType']) ? $diploma['diplomaType']['textDe'] : null,
+                                    'diplomaTypeFr' => isset($diploma['diplomaType']) ? $diploma['diplomaType']['textFr'] : null,
+                                    'diplomaTypeIt' => isset($diploma['diplomaType']) ? $diploma['diplomaType']['textIt'] : null,
+                                    'diplomaTypeEn' => isset($diploma['diplomaType']) ? $diploma['diplomaType']['textEn'] : null,
+                                    'issuanceDate' => isset($diploma['issuanceDate']) ? format_date($diploma['issuanceDate']) : null,
+                                    'issuanceCountryDe' => isset($diploma['issuanceCountry']) ? $diploma['issuanceCountry']['textDe'] : null,
+                                    'issuanceCountryFr' => isset($diploma['issuanceCountry']) ? $diploma['issuanceCountry']['textFr'] : null,
+                                    'issuanceCountryIt' => isset($diploma['issuanceCountry']) ? $diploma['issuanceCountry']['textIt'] : null,
+                                    'issuanceCountryEn' => isset($diploma['issuanceCountry']) ? $diploma['issuanceCountry']['textEn'] : null,
+                                    'datePsyko' => isset($diploma['datePsyko']) ? format_date($diploma['datePsyko']) : null
+                                ];
+                            }
+                            
+                            foreach ($person['cetTitles'] as $title_nr => $title) {
+                                $data_map_d['cetTitles'][] = [
+                                    'gln' => (int) $person['gln'],
+                                    'title_nr' => $title_nr + 1,
+                                    'titleTypeDe' => isset($title['cetTitleType']) ? $title['cetTitleType']['textDe'] : null,
+                                    'titleTypeFr' => isset($title['cetTitleType']) ? $title['cetTitleType']['textFr'] : null,
+                                    'titleTypeIt' => isset($title['cetTitleType']) ? $title['cetTitleType']['textIt'] : null,
+                                    'titleTypeEn' => isset($title['cetTitleType']) ? $title['cetTitleType']['textEn'] : null,
+                                    'titleKindDe' => isset($title['cetTitleKind']) ? $title['cetTitleKind']['textDe'] : null,
+                                    'titleKindFr' => isset($title['cetTitleKind']) ? $title['cetTitleKind']['textFr'] : null,
+                                    'titleKindIt' => isset($title['cetTitleKind']) ? $title['cetTitleKind']['textIt'] : null,
+                                    'titleKindEn' => isset($title['cetTitleKind']) ? $title['cetTitleKind']['textEn'] : null,
+                                    'issuanceCountryDe' => isset($title['issuanceCountry']) ? $title['issuanceCountry']['textDe'] : null,
+                                    'issuanceCountryFr' => isset($title['issuanceCountry']) ? $title['issuanceCountry']['textFr'] : null,
+                                    'issuanceCountryIt' => isset($title['issuanceCountry']) ? $title['issuanceCountry']['textIt'] : null,
+                                    'issuanceCountryEn' => isset($title['issuanceCountry']) ? $title['issuanceCountry']['textEn'] : null,
+                                    'issuanceDate' => isset($title['issuanceDate']) ? format_date($title['issuanceDate']) : null,
+                                    'datePsyko' => isset($title['datePsyko']) ? format_date($title['datePsyko']) : null,
+                                    'cetCourseDe' => isset($title['cetCourse']) ? $title['cetCourse']['textDe'] : null,
+                                    'cetCourseFr' => isset($title['cetCourse']) ? $title['cetCourse']['textFr'] : null,
+                                    'cetCourseIt' => isset($title['cetCourse']) ? $title['cetCourse']['textIt'] : null,
+                                    'cetCourseEn' => isset($title['cetCourse']) ? $title['cetCourse']['textEn'] : null,
+                                    'cetCourseName' => $title['cetCourseName'],
+                                    'organisationName' => isset($title['organisation']) ? $title['organisation']['name'] : null,
+                                    'organisationZip' => isset($title['organisation']) ? $title['organisation']['zip'] : null,
+                                    'organisationCity' => isset($title['organisation']) ? $title['organisation']['city'] : null,
+                                    'additionalIssuanceCountry' => $title['additionalIssuanceCountry'],
+                                    'additionalIssuanceDate' => $title['additionalIssuanceDate'],
+                                    'additionalCetCourse' => $title['additionalCetCourse'],
+                                    'additionalOrganisation' => $title['additionalOrganisation'],
+                                    'providers90Days' => json_encode($title['providers90Days']),
+                                    'hasPermissionOtherThanNoLicence' => $title['hasPermissionOtherThantNoLicence']
+                                ];
+                            
+                                foreach ($title['permissions'] as $perm_nr => $perm) {
+                                    $data_map_d['permissions'][] = [
+                                        'gln' => (int) $person['gln'],
+                                        'title_nr' => $title_nr + 1,
+                                        'perm_nr' => $perm_nr + 1,
+                                        'legalBasisDe' => $perm['legalBasis']['textDe'],
+                                        'legalBasisFr' => $perm['legalBasis']['textFr'],
+                                        'legalBasisIt' => $perm['legalBasis']['textIt'],    
+                                        'legalBasisEn' => $perm['legalBasis']['textEn'],
+                                        'permissionStateDe' => isset($perm['permissionState']) ? $perm['permissionState']['textDe'] : null,
+                                        'permissionStateFr' => isset($perm['permissionState']) ? $perm['permissionState']['textFr'] : null,
+                                        'permissionStateIt' => isset($perm['permissionState']) ? $perm['permissionState']['textIt'] : null,
+                                        'permissionStateEn' => isset($perm['permissionState']) ? $perm['permissionState']['textEn'] : null,
+                                        'cantonDe' => $perm['canton']['textDe'],
+                                        'cantonFr' => $perm['canton']['textFr'],
+                                        'cantonIt' => $perm['canton']['textIt'],
+                                        'cantonEn' => $perm['canton']['textEn'],
+                                        'timeLimitationDate' => isset($perm['timeLimitationDate']) ? format_date($perm['timeLimitationDate']) : null,
+                                        'dateDecision' => isset($perm['dateDecision']) ? format_date($perm['dateDecision']) : null,
+                                        'restrictions' => json_encode($perm['restrictions'])
+                                    ];
+                            
+                                    foreach ($perm['addresses'] as $addr_nr => $addr) {
+                                        $data_map_d['permissionAddresses'][] = [
+                                            'gln' => (int) $person['gln'],
+                                            'title_nr' => $title_nr + 1,
+                                            'perm_nr' => $perm_nr + 1,
+                                            'addr_nr' => $addr_nr + 1,
+                                            'practiceCompanyName' => $addr['practiceCompanyName'],
+                                            'streetWithNumber' => $addr['streetWithNumber'],
+                                            'addition1' => $addr['addition1'],
+                                            'addition2' => $addr['addition2'],
+                                            'zipCity' => $addr['zipCity'],
+                                            'zip' => $addr['zip'],
+                                            'city' => $addr['city'],
+                                            'phoneNumber' => $addr['phoneNumber'],
+                                            'email' => $addr['email']
+                                        ];
+                                    }
+                                }
+                            }
+                            
+                        }
+                    }
+                        
+            
+                    if ($register == 'betreg') {
+                        if (isset($person['id']) && !empty($person['id'])) {
+                            $data_map_d['companyGln'][] = [
+                                'bag_id' => $person['id'],
+                                'glnCompany' => isset($person['glnCompany']) ? (int) $person['glnCompany'] : null,
+                                'companyName' => $person['name'],
+                                'additionalName' => $person['additionalName'],
+                                'streetWithNumber' => $person['streetWithNumber'],
+                                'poBox' => $person['poBox'],
+                                'zip' => $person['zip'],
+                                'zipCity' => $person['zipCity'],
+                                'city' => $person['city'],
+                                'cantonDe' => $person['canton']['textDe'],
+                                'cantonFr' => $person['canton']['textFr'],
+                                'cantonIt' => $person['canton']['textIt'],
+                                'cantonEn' => $person['canton']['textEn'],
+                                'companyTypeDe' => $person['companyType']['textDe'],
+                                'companyTypeFr' => $person['companyType']['textFr'],
+                                'companyTypeIt' => $person['companyType']['textIt'],
+                                'companyTypeEn' => $person['companyType']['textEn'],
+                                'permissionBtmDe' => $person['permissionBtm']['textDe'],
+                                'permissionBtmFr' => $person['permissionBtm']['textFr'],
+                                'permissionBtmIt' => $person['permissionBtm']['textIt'],
+                                'permissionBtmEn' => $person['permissionBtm']['textEn']
+                            ];
+                            
+                            foreach ($person['responsiblePersons'] as $resp) {
+                                $data_map_d['responsiblePersons'][] = [
+                                    'bag_id' => $person['id'],
+                                    'glnPerson' => $resp['gln'],
+                                    'familyName' => format_name($resp['name']),
+                                    'firstName' => format_name($resp['firstName'])
+                                ];
+                            }
+                        }
+                        
+                    }
+                } catch (Exception $e) {
+
                 }
-                $count++;
 
-                echo "\n\n";
+            }
 
-                //$curr_id = $existing_ids[++$count];
+            foreach ($data_map_d as $table => $values) {
+                foreach($values as $value) {
+                    foreach ($value as $k => $v) {
+                        if ($v == "" || $v == null || $v =='[]') {
+                            unset($value[$k]);
+                        }
+                    }
+
+                    $columns = array_keys($value);
+                    $myValues = array_values($value);
+
+                    /*foreach($myValues as $for) {
+                        echo "$for\n";
+                    }*/
+
+                    $formatted_values = format_values($myValues);
+
+
+                    $query = "INSERT INTO " . $tab_infix . "_" . $table . "(" . implode(', ', $columns) . ") VALUES ($formatted_values)";
+                    //echo "$query\n";
+                    $conn->query($query);
+                }
             }
 
 
