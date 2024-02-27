@@ -64,9 +64,9 @@
             } else {
                 if ($table_name == 'med_permissionAddress') {
                     $name_mapper = $med_permissionaddress_names;
-                } else if ($table_name == 'med_cettitles') {
+                } else if ($table_name == 'med_cetTitles') {
                     $name_mapper = $med_cettitles_names;
-                } else if ($table_name == 'med_privatelawcettitles') {
+                } else if ($table_name == 'med_privateLawCetTitles') {
                     $name_mapper = $med_privatelawcettitles_names;
                 }
             }
