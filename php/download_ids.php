@@ -70,7 +70,7 @@
 
                     $query .= " WHERE id = $curr_id";
     
-                    $conn->query($query);
+                    //$conn->query($query);
 
                     $curr_id++;
                 }
