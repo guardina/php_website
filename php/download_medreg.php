@@ -57,7 +57,7 @@
 
 
 
-    function download_all_medreg_data($register, $number_of_samples) {
+    function download_all_medreg_data($register, $number_of_samples, $start_from=0) {
 
         global $can_have_multiple;
 
@@ -73,10 +73,11 @@
             $url = "https://www.healthreg-public.admin.ch/api/betreg/public/company";
         }
 
-        $bucket = 1;
-        $count = 0;
+        $bucket = ($start_from / $requests_per_bucket) + 1;
+        //$count = 0;   
 
-        for ($i = 0; $i<$number_of_samples; $i+=$requests_per_bucket) {
+        for ($i = $start_from; $i<$number_of_samples; $i+=$requests_per_bucket) {
+            $count = 0;
             echo $i . " ---- " . $number_of_samples . "\n";
             echo "[Bucket $bucket] Starting data download! ($register)\n";
 
@@ -161,7 +162,7 @@
 
                 try {
                     if (in_array($register, ['medreg', 'psyreg'])) {
-                        if (isset($person['gln'])) {
+                        if (isset($person['gln']) && $person['gln'] != null) {
                             $data_map_d['gln'][] = [
                                 'gln' => (int)$person['gln'],
                                 'id' => $person['id'],
@@ -200,7 +201,7 @@
                     }
             
                     if ($register == 'medreg') {
-                        if (isset($person['gln']) && !empty($person['gln'])) {
+                        if (isset($person['gln']) && $person['gln'] != null) {
                             foreach ($person['professions'] as $prof) {
                                 $data_map_d['professions'][] = [
                                     'gln' => (int)$person['gln'],
@@ -311,11 +312,11 @@
                                     ];
                                 }
                             }
-                        }
+                        } 
                     }
             
                     if ($register == 'psyreg') {
-                        if (isset($person['gln']) && !empty($person['gln'])) {
+                        if (isset($person['gln']) && $person['gln'] != null) {
                             foreach ($person['diplomas'] as $diploma) {
                                 $data_map_d['diplomas'][] = [
                                     'gln' => (int) $person['gln'],
@@ -417,7 +418,7 @@
                         
             
                     if ($register == 'betreg') {
-                        if (isset($person['id']) && !empty($person['id'])) {
+                        if (isset($person['id']) && $person['id'] != null) {
                             $data_map_d['companyGln'][] = [
                                 'bag_id' => $person['id'],
                                 'glnCompany' => isset($person['glnCompany']) ? (int) $person['glnCompany'] : null,
@@ -459,6 +460,7 @@
 
             }
 
+
             foreach ($data_map_d as $table => $values) {
                 foreach($values as $value) {
                     foreach ($value as $k => $v) {
@@ -481,7 +483,9 @@
                     //echo "$query\n";
                     $conn->query($query);
                 }
+                //echo "\n\n";
             }
+
 
 
 
@@ -494,8 +498,45 @@
     }
 
 
+
+    function check_for_new_data($register) {
+        $conn = connect_to_db('stammdaten_gln');
+
+        $existing_ids = get_existing_ids($register);
+
+        echo "Checking numbers for register $register:\n";
+        foreach($existing_ids as $id) {
+            echo "$id\n";
+        }
+
+        echo "\n\n";
+    }
+
+
+
+    function update_data($register) {
+        $conn = connect_to_db('stammdaten_gln');
+
+        $missing_ids = get_missing_ids($register);
+
+        echo "Updating numbers for register $register:\n";
+        foreach($missing_ids as $id) {
+            echo "$id\n";
+        }
+
+        echo "\n\n";
+    }
+
+
+    /*foreach(['medreg', 'psyreg', 'betreg'] as $register) {
+        //check_for_new_data($register);
+        update_data($register);
+    }*/
+    
+
+
     if ($argc < 3) {
-        echo "Usage: php download_ids.php <register> <number of samples>\n";
+        echo "Usage: php download_ids.php <register> <number of samples> <starting_index>\n";
         echo "Possible registers: medreg, psyreg, betreg\n";
         echo "Range for samples: 100 - 200000\n";
         exit(1);
@@ -503,5 +544,6 @@
 
     $register = $argv[1];
     $number_of_samples = $argv[2];
-    download_all_medreg_data($register, $number_of_samples);
+    $start_from = $argv[3];
+    download_all_medreg_data($register, $number_of_samples, $start_from);
 ?>
