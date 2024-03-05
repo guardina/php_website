@@ -125,7 +125,7 @@
     function get_missing_ids($register) {
         $conn = connect_to_db("stammdaten_gln");
 
-        $query = "SELECT id FROM " . substr($register, 0, -3) . "_ids WHERE round_1 = 0 AND (round_2 = 0 OR round_2 = NULL)";
+        $query = "SELECT id FROM " . substr($register, 0, -3) . "_ids WHERE round_1 = 0 AND (round_2 = 0 OR round_2 IS NULL)";
 
         $missing_ids = [];
 
@@ -159,34 +159,4 @@
         return mysqli_num_rows($result) > 0;
     }
 
-
-
-    // TAKES 2 DICTIONARIES: FIRST IT MAPS THE SCRAPED NAMES TO DB NAMES, THEN ISERTS THEM INTO THE DB<
-
-    /*
-
-            // myDictionary has keys taken from the HTML response provided by the site, we need to map them to the column's names in the SQL table
-            $columns = array();
-            $values = array();
-
-            $columns[] = 'gln';
-            $values[] = "$gln";
-
-            foreach ($null_less_dictionary as $key => $value) {
-                if (isset($columnMapping[$key])) {
-                    $columns[] = $columnMapping[$key];
-                    $values[] = "'" . mysqli_real_escape_string($conn, $value) . "'";
-                }
-            }
-        
-
-
-            
-            $query = "INSERT INTO Doctors (" . implode(', ', $columns) . ") VALUES (" . implode(', ', $values) . ")";
-
-
-            mysqli_query($conn, $query);
-
-            mysqli_close($conn);
-            */
 ?>
