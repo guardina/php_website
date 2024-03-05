@@ -145,8 +145,6 @@
 
             foreach ($results as $result) {
 
-                // HERE WE CAN TAKE THE DATA, AS RESULT HAS FIRST NAME, LAST NAME, AND SO ON
-
                 $query = "INSERT INTO " . substr($register, 0, -3) . "_ids(id, bucket, round_1) VALUES ($curr_id, $bucket, ";
 
                 if ($result !== null) {

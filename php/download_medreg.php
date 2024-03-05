@@ -5,7 +5,6 @@
     include "medreg_HTTP_controller.php";
 
     $requests_per_bucket = 100;
-    $can_have_multiple = array('permissions', 'cetTitles', 'privateLawCetTitles', 'addresses');
 
 
     // Function that puts every first and last name in the correct format (first letter uppercase, the rest lowercase)
@@ -57,13 +56,9 @@
 
 
 
-    function download_all_medreg_data($register, $number_of_samples, $start_from=0) {
-
-        global $can_have_multiple;
+    function download_all_medreg_data($register, $mode, $number_of_samples, $start_from=0) {
 
         $conn = connect_to_db("stammdaten_gln");
-
-        //$existing_ids = get_existing_ids($register);
 
         global $requests_per_bucket;
 
@@ -74,29 +69,70 @@
         }
 
         $bucket = ($start_from / $requests_per_bucket) + 1;
-        //$count = 0;   
 
         for ($i = $start_from; $i<$number_of_samples; $i+=$requests_per_bucket) {
             $count = 0;
-            echo $i . " ---- " . $number_of_samples . "\n";
-            echo "[Bucket $bucket] Starting data download! ($register)\n";
-
-            //$curr_id = $existing_ids[$count];
+            $existing_ids = get_existing_ids($register);
+            $missing_ids = get_missing_ids($register);
 
 
-            if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
-                echo "[Bucket $bucket] Already present in database ($register)\n\n";
-                $bucket++;
-                $count+=100;
-                continue;
+            if ($mode == 'download') {
+                echo $i . " ---- " . $number_of_samples . "\n";
+                echo "[Bucket $bucket] Starting data download! ($register)\n";
+
+                if (bucket_already_exists_in_db($conn, $register, $i, $i+$requests_per_bucket)) {
+                    echo "[Bucket $bucket] Already present in database ($register)\n\n";
+                    $bucket++;
+                    $count+=100;
+                    continue;
+                }
+
+            } else if ($mode == 'update') {
+                echo $i . " ---- " . count($existing_ids) . "\n";
+                echo "[Bucket $bucket] Starting data update! ($register)\n";
+            } else if ($mode == 'seek') {
+                echo $i . " ---- " . count($missing_ids) . "\n";
+                echo "[Bucket $bucket] Starting data seek! ($register)\n";
             }
 
 
             if (in_array($register, ['medreg', 'psyreg'])) {
                 $payloads = [];
-                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
-                    $payloads[] = ['id' => $j];
-                }   
+                if ($mode == 'download') {
+                    for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                        $payloads[] = ['id' => $j];
+                    }  
+                } else if ($mode == 'update') {
+                    if (count($existing_ids) - $i > $requests_per_bucket) {
+                        for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                            //$payloads[] = ['id' => $existing_ids[$j]];
+                            echo "$existing_ids[$j] -> $j\n";
+                        }
+                    } else {
+                        $upper_limit = count($existing_ids) - $i;
+
+                        for ($j = $i; $j < $upper_limit; $j++) {
+                            //$payloads[] = ['id' => $existing_ids[$j]];
+                            echo "$existing_ids[$j]\n";
+                        }
+                    } 
+
+                } else if ($mode == 'seek') {
+                    if (count($existing_ids) - $i > $requests_per_bucket) {
+                        for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                            $payloads[] = ['id' => $missing_ids[$j]];
+                            //echo "$missing_ids[$j]\n";
+                        }
+                    } else {
+                        $upper_limit = count($missing_ids) - $i;
+
+                        for ($j = $i; $j < $upper_limit; $j++) {
+                            $payloads[] = ['id' => $missing_ids[$j]];
+                            //echo "$missing_ids[$j]\n";
+                        }
+                    } 
+                }
+                 
 
                 $start_time = microtime(true);
                 $results = makeParallelRequests($url, $payloads, $register);
@@ -105,9 +141,40 @@
             } else if ($register == 'betreg') {
                 $urls = [];
                 $payloads = [];
-                for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
-                    $urls[] = $url . "/" . $j;
-                }   
+                if ($mode == 'download') {
+                    for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                        $urls[] = $url . "/" . $j;
+                    }  
+                } else if ($mode == 'update') {
+                    if (count($existing_ids) - $i > $requests_per_bucket) {
+                        for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                            //$urls[] = $url . "/" . $existing_ids[$j];
+                            echo "$url/$existing_ids[$j]\n";
+                        }
+                    } else {
+                        $upper_limit = count($existing_ids) - $i;
+
+                        for ($j = $i; $j < $upper_limit; $j++) {
+                            //$urls[] = $url . "/" . $existing_ids[$j];
+                            echo "$url/$existing_ids[$j]\n";
+                        }
+                    } 
+                } else if ($mode == 'seek') {
+                    if (count($missing_ids) - $i > $requests_per_bucket) {
+                        for ($j = $i; $j < $bucket*$requests_per_bucket; $j++) {
+                            //$urls[] = $url . "/" . $missing_ids[$j];
+                            echo "$url/$missing_ids[$j]\n";
+                        }
+                    } else {
+                        $upper_limit = count($missing_ids) - $i;
+
+                        for ($j = $i; $j < $upper_limit; $j++) {
+                            //$urls[] = $url . "/" . $missing_ids[$j];
+                            echo "$url/$missing_ids[$j]\n";
+                        }
+                    } 
+                }
+                 
 
                 $start_time = microtime(true);
                 $results = makeParallelRequests($urls, $payloads, $register);
@@ -178,25 +245,27 @@
                                 'hasProvider90Days' => $person['hasProvider90Days']
                             ];
                 
-                            foreach ($person['nationalities'] as $nat) {
+                            //foreach ($person['nationalities'] as $nat) {
+                                $nat = $person['nationalities'];
                                 $data_map_d['nationalities'][] = [
                                     'gln' => (int)$person['gln'],
-                                    'nationalityDe' => $nat['textDe'],
-                                    'nationalityFr' => $nat['textFr'],
-                                    'nationalityIt' => $nat['textIt'],
-                                    'nationalityEn' => $nat['textEn']
+                                    'nationalityDe' => $nat['0']['textDe'],
+                                    'nationalityFr' => $nat['0']['textFr'],
+                                    'nationalityIt' => $nat['0']['textIt'],
+                                    'nationalityEn' => $nat['0']['textEn']
                                 ];
-                            }
+                            //}
                 
-                            foreach ($person['languageSkills'] as $lang) {
+                            //foreach ($person['languageSkills'] as $lang) {
+                                $lang = $person['languageSkills'];
                                 $data_map_d['languages'][] = [
                                     'gln' => (int)$person['gln'],
-                                    'languageDe' => $lang['textDe'],
-                                    'languageFr' => $lang['textFr'],
-                                    'languageIt' => $lang['textIt'],
-                                    'languageEn' => $lang['textEn']
+                                    'languageDe' => $lang['0']['textDe'],
+                                    'languageFr' => $lang['0']['textFr'],
+                                    'languageIt' => $lang['0']['textIt'],
+                                    'languageEn' => $lang['0']['textEn']
                                 ];
-                            }
+                            //}
                         }
                     }
             
@@ -472,17 +541,29 @@
                     $columns = array_keys($value);
                     $myValues = array_values($value);
 
-                    /*foreach($myValues as $for) {
-                        echo "$for\n";
-                    }*/
 
                     $formatted_values = format_values($myValues);
 
+                    if ($mode == 'download') {
+                        $query = "INSERT INTO " . $tab_infix . "_" . $table . "(" . implode(', ', $columns) . ") VALUES ($formatted_values)";
+                        //echo "$query\n";
+                        $conn->query($query);
+                    } else if ($mode == 'update') {
+                        $query_update = "UPDATE " . $tab_infix . "_gln SET expiry_dt = " . funca() . " WHERE id = " . $value['id'];
+                    } else if ($mode == 'seek') {
+                        $query_insert = "INSERT INTO " . $tab_infix . "_" . $table . "(" . implode(', ', $columns) . ") VALUES ($formatted_values)";
+                        echo "$query_insert\n";
+                        //$conn->query($query_insert);
 
-                    $query = "INSERT INTO " . $tab_infix . "_" . $table . "(" . implode(', ', $columns) . ") VALUES ($formatted_values)";
-                    //echo "$query\n";
-                    $conn->query($query);
+                        $query_update = "UPDATE " . $tab_infix . "_ids SET round_1 = 1 WHERE id = " . $value['id'];
+                        echo "$query_update\n";
+                        //$conn->query($query_update    );
+                    }
+
+
+                    
                 }
+                //echo "done\n";
                 //echo "\n\n";
             }
 
@@ -505,9 +586,10 @@
         $existing_ids = get_existing_ids($register);
 
         echo "Checking numbers for register $register:\n";
-        foreach($existing_ids as $id) {
+        /*foreach($existing_ids as $id) {
             echo "$id\n";
-        }
+        }*/
+        echo count($existing_ids) . " existing!\n";
 
         echo "\n\n";
     }
@@ -515,23 +597,18 @@
 
 
     function update_data($register) {
-        $conn = connect_to_db('stammdaten_gln');
+        //$conn = connect_to_db('stammdaten_gln');
 
         $missing_ids = get_missing_ids($register);
 
         echo "Updating numbers for register $register:\n";
-        foreach($missing_ids as $id) {
+        /*foreach($missing_ids as $id) {
             echo "$id\n";
-        }
+        }*/
+        echo count($missing_ids) . " missing!\n";
 
         echo "\n\n";
     }
-
-
-    /*foreach(['medreg', 'psyreg', 'betreg'] as $register) {
-        //check_for_new_data($register);
-        update_data($register);
-    }*/
     
 
 
@@ -542,8 +619,17 @@
         exit(1);
     }
 
-    $register = $argv[1];
-    $number_of_samples = $argv[2];
-    $start_from = $argv[3];
-    download_all_medreg_data($register, $number_of_samples, $start_from);
+    if ($argv[4] == 'test') {
+        foreach(['medreg', 'psyreg', 'betreg'] as $register) {
+            //check_for_new_data($register);
+            //update_data($register);
+            download_all_medreg_data($register, $mode, $number_of_samples, $start_from);
+        }
+    } else {
+        $register = $argv[1];
+        $mode = $argv[2];
+        $number_of_samples = $argv[3];
+        $start_from = $argv[4];
+        download_all_medreg_data($register, $mode, $number_of_samples, $start_from);
+    }
 ?>
