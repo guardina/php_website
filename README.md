@@ -10,6 +10,9 @@ Contains css file to define the style of some html parts. So far only the color 
 #### data: 
 Contains the XML file with all the data downloaded from refdata and the script to save all the data in the database
 
+#### excel:
+Holds excel files that define the tables for the FIRE project database
+
 #### html:
 Default html folder that contains some html (not used)
 
