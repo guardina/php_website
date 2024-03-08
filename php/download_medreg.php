@@ -244,28 +244,36 @@
                                 'hasPermission' => $person['hasPermission'],
                                 'hasProvider90Days' => $person['hasProvider90Days']
                             ];
+
+                            $unique_nationalities = array();
+                            $filtered_nationalities = array();
+
+                            foreach($person['nationalities'] as $nat) {
+                                if (!in_array($nat['textEn'], $unique_nationalities)) {
+                                    $filtered_nationalities[] = $nat;
+                                    $unique_nationalities[] = $nat['textEn'];
+                                }
+                            }
                 
-                            //foreach ($person['nationalities'] as $nat) {
-                                $nat = $person['nationalities'];
+                            foreach ($filtered_nationalities as $nat) {
                                 $data_map_d['nationalities'][] = [
                                     'gln' => (int)$person['gln'],
-                                    'nationalityDe' => $nat['0']['textDe'],
-                                    'nationalityFr' => $nat['0']['textFr'],
-                                    'nationalityIt' => $nat['0']['textIt'],
-                                    'nationalityEn' => $nat['0']['textEn']
+                                    'nationalityDe' => $nat['textDe'],
+                                    'nationalityFr' => $nat['textFr'],
+                                    'nationalityIt' => $nat['textIt'],
+                                    'nationalityEn' => $nat['textEn']
                                 ];
-                            //}
+                            }
                 
-                            //foreach ($person['languageSkills'] as $lang) {
-                                $lang = $person['languageSkills'];
+                            foreach ($person['languageSkills'] as $lang) {
                                 $data_map_d['languages'][] = [
                                     'gln' => (int)$person['gln'],
-                                    'languageDe' => $lang['0']['textDe'],
-                                    'languageFr' => $lang['0']['textFr'],
-                                    'languageIt' => $lang['0']['textIt'],
-                                    'languageEn' => $lang['0']['textEn']
+                                    'languageDe' => $lang['textDe'],
+                                    'languageFr' => $lang['textFr'],
+                                    'languageIt' => $lang['textIt'],
+                                    'languageEn' => $lang['textEn']
                                 ];
-                            //}
+                            }
                         }
                     }
             
