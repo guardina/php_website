@@ -621,8 +621,9 @@
 
 
     if ($argc < 3) {
-        echo "Usage: php download_ids.php <register> <number of samples> <starting_index>\n";
+        echo "Usage: php download_ids.php <register> <mode> <number of samples> <starting_index>\n";
         echo "Possible registers: medreg, psyreg, betreg\n";
+        echo "Possible modes: download, update, seek\n";
         echo "Range for samples: 100 - 200000\n";
         exit(1);
     }
