@@ -29,3 +29,8 @@ Contains all of the scripts in php for the core part of the code:
 
 #### sql:
 Contains sql scripts to create SQL tables
+###### bag: 
+SQL scripts to create medreg, psyreg, betreg and refdata related tables
+###### fire: 
+SQL scripts to create FIRE related tables (Work in progress)
+Doctor, Practice, Address, t_practice_assistance, t_address, t_practice, ...
