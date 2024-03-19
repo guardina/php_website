@@ -13,9 +13,11 @@ CREATE TABLE Doctor (
     ,   title1                          VARCHAR(20)
     ,   title2                          VARCHAR(20)
     ,   fmh                             VARCHAR(50)
+    ,   has_diploma                     BOOL
     ,   lp                              BOOL
     ,   la                              BOOL
     ,   pa                              BOOL
+    ,   pa_category                     VARCHAR(50) 
     ,   students_nr                     INTEGER
     ,   comments                        VARCHAR(200)
     
@@ -59,6 +61,8 @@ CREATE TABLE Practice (
     ,   practice_opening_dt             INTEGER
     ,   specializations                 VARCHAR(200)
     ,   students_nr                     INTEGER
+    ,   network                         VARCHAR(50)
+    ,   manager                         VARCHAR(100)
 
     ,   PRIMARY KEY (practice_id)
 );
@@ -142,6 +146,21 @@ CREATE TABLE t_practice (
         ON DELETE CASCADE
         ON UPDATE CASCADE
 )
+
+
+
+
+CREATE TABLE t_apprenticeship (
+        gln                             BIG INTEGER
+    ,   apprencticeship_id              INTEGER
+
+    ,   FOREIGN KEY (gln) REFERENCES Doctor(gln)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+    ,   FOREIGN KEY (apprenticeship_id) REFERENCES Apprenticeship(apprenticeship_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);
 
 
 
