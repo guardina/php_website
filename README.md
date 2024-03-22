@@ -34,3 +34,15 @@ SQL scripts to create medreg, psyreg, betreg and refdata related tables
 ###### fire: 
 SQL scripts to create FIRE related tables (Work in progress)
 Doctor, Practice, Address, t_practice_assistance, t_address, t_practice, ...
+
+
+### <u>Single files</u>
+
+#### composer.json:
+File used to defined the libraries used in php for specific tasks
+
+#### excel.php:
+Php script used to extract important information from 5 different excel files, with the correct format
+
+#### index.php:
+Default index.php file that represents the main frontend page
